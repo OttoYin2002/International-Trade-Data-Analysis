@@ -1,0 +1,2028 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>外贸订单分析平台</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing: border-box; }
+:root {
+  --bg: #f5f7fa; --card: #ffffff; --primary: #00489D;
+  --primary-light: #e8f1fb; --accent-1: #0073e6; --accent-2: #5b9bd5;
+  --text: #1e293b; --text-secondary: #64748b;
+  --border: #e2e8f0; --success: #16a34a;
+  --shadow-sm: 0 1px 2px rgba(0,72,157,0.04);
+  --shadow: 0 2px 8px rgba(0,72,157,0.07); --radius: 4px; --radius-sm: 3px;
+  --navy: #00489D; --navy-dark: #003366; --navy-mid: #336699;
+  --blue: #0073e6; --blue-light: #4da6ff; --blue-pale: #e8f1fb;
+  --gold: #c8860d; --gold-light: #f5e6c8;
+  --green: #16a34a; --red: #dc2626;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6;
+}
+.header {
+  background: var(--navy); padding: 32px 0 28px; text-align: center; color: #fff;
+  border-bottom: 3px solid var(--blue);
+}
+.header h1 { font-size: 22px; font-weight: 600; letter-spacing: 1px; }
+.header p { font-size: 12px; opacity: 0.7; margin-top: 6px; letter-spacing: 0.5px; }
+.container { max-width: 1400px; margin: 0 auto; padding: 0 24px; }
+
+/* Upload */
+.upload-section { margin-top: -18px; position: relative; z-index: 2; }
+.upload-card {
+  background: var(--card); border-radius: var(--radius);
+  padding: 36px 32px; box-shadow: var(--shadow); text-align: center;
+}
+.upload-card.dragover { border: 2px dashed var(--blue); background: var(--blue-pale); }
+.upload-icon { width: 48px; height: 48px; margin: 0 auto 14px; background: var(--blue-pale); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.upload-icon svg { width: 24px; height: 24px; color: var(--blue); }
+.upload-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+.upload-card .hint { font-size: 12px; color: var(--text-secondary); margin-bottom: 18px; }
+.upload-card input[type="file"] { display: none; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 20px; border: none; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
+  transition: all 0.15s;
+}
+.btn-primary { background: var(--navy); color: #fff; }
+.btn-primary:hover { background: var(--navy-dark); }
+.btn-outline { background: #fff; color: var(--text); border: 1px solid var(--border); }
+.btn-outline:hover { border-color: var(--blue); color: var(--blue); }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+.btn:hover { opacity: 1; }
+
+/* File Bar */
+.file-bar {
+  display: none; margin-top: 16px; padding: 14px 20px;
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+}
+.file-bar.show { display: flex; }
+.file-info { display: flex; align-items: center; gap: 12px; }
+.file-icon { width: 34px; height: 34px; background: var(--blue-pale); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; }
+.file-icon svg { width: 16px; height: 16px; color: var(--blue); }
+.file-name { font-weight: 600; font-size: 14px; }
+.file-meta { font-size: 12px; color: var(--text-secondary); }
+
+/* Stats */
+.stats-row {
+  display: none; margin-top: 16px; gap: 16px; grid-template-columns: repeat(4, 1fr);
+}
+.stats-row.show { display: grid; }
+.stat-card {
+  background: var(--card); border-radius: var(--radius); padding: 18px 20px;
+  box-shadow: var(--shadow-sm); text-align: center;
+}
+.stat-value { font-size: 26px; font-weight: 700; color: var(--navy); }
+.stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Tabs */
+.tabs-section { display: none; margin-top: 20px; }
+.tabs-section.show { display: block; }
+.tabs-nav { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 2px solid var(--border); }
+.tab-btn {
+  padding: 10px 24px; font-size: 13px; font-weight: 500; cursor: pointer;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  margin-bottom: -2px; color: var(--text-secondary); font-family: inherit;
+  letter-spacing: 0.3px; transition: all 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--navy); border-bottom-color: var(--navy); font-weight: 600; }
+.tab-panel { display: none; }
+.tab-panel.show { display: block; }
+
+/* Panel Card */
+.panel-card {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  padding: 20px; margin-bottom: 16px;
+}
+
+/* Month chips */
+.year-group { margin-bottom: 12px; }
+.year-group-title {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+  color: var(--text-secondary); cursor: pointer; padding: 4px 0; user-select: none;
+}
+.year-group-title input[type="checkbox"] { cursor: pointer; }
+.year-label { font-size: 14px; color: var(--text); }
+.year-count { font-size: 11px; color: var(--text-secondary); }
+.month-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 4px 24px; }
+.month-chip {
+  padding: 5px 14px; border-radius: 20px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--border); background: #fff; transition: all 0.15s;
+  user-select: none;
+}
+.month-chip:hover { border-color: var(--blue); color: var(--blue); }
+.month-chip.selected { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+/* Pivot actions */
+.pivot-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.info { font-size: 12px; color: var(--text-secondary); }
+
+/* Table */
+.table-section { display: none; margin-top: 16px; }
+.table-section.show { display: block; }
+.table-card {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border); overflow: hidden;
+}
+.table-header {
+  padding: 18px 24px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+}
+.table-header h3 { font-size: 15px; font-weight: 600; }
+.badge { background: var(--blue-pale); color: var(--blue); font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: var(--radius-sm); }
+.table-wrap { overflow-x: auto; overflow-y: auto; max-height: 560px; padding: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 700px; }
+thead th {
+  background: var(--navy); color: #fff; padding: 10px 16px; text-align: center;
+  font-weight: 600; font-size: 12px; letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--navy-dark); white-space: nowrap; position: sticky; top: 0; z-index: 2;
+}
+thead th:first-child { text-align: left; padding-left: 20px; }
+th.col-total { background: var(--navy-dark); color: #fff; }
+tbody td { padding: 8px 16px; text-align: center; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: 13px; }
+tbody td:first-child { text-align: left; padding-left: 20px; }
+tbody tr:nth-child(even) td { background: #f7f9fc; }
+tbody tr:hover td { background: var(--blue-pale); }
+tfoot td { padding: 10px 16px; text-align: center; font-weight: 700; border-top: 2px solid var(--navy); background: var(--primary-light); position: sticky; bottom: 0; z-index: 1; color: var(--navy); }
+tfoot td:first-child { text-align: left; padding-left: 20px; }
+.zero-val { color: #ccc; }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); display: none; }
+.empty-state.show { display: block; }
+
+/* Client clickable link */
+.client-link { cursor: pointer; color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+.client-link:hover { color: var(--navy); font-weight: 600; }
+
+/* Pivot Drill-down */
+.drill-section { display: none; margin-top: 16px; }
+.drill-section.show { display: block; }
+.drill-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--border); overflow: hidden; }
+.drill-header { padding: 14px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.drill-header h3 { font-size: 14px; font-weight: 600; }
+.drill-body { padding: 16px; }
+.drill-table-wrap { overflow-x: auto; overflow-y: auto; max-height: 380px; margin-bottom: 16px; }
+.drill-chart-container { width: 100%; height: 380px; }
+.drill-close-btn {
+  width: 28px; height: 28px; border: none; background: transparent;
+  color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; font-size: 18px;
+}
+.drill-close-btn:hover { background: #fee; color: var(--red); }
+
+.btn-accent {
+  background: var(--blue); color: #fff; border: none;
+  box-shadow: 0 1px 4px rgba(0,115,230,0.3);
+}
+.btn-accent:hover { background: #0062c4; box-shadow: 0 2px 8px rgba(0,115,230,0.4); }
+
+/* Raw data drill-down */
+.raw-section { display: none; margin-top: 16px; }
+.raw-section.show { display: block; }
+.raw-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--border); overflow: hidden; }
+.raw-header { padding: 12px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.raw-header h3 { font-size: 14px; font-weight: 600; }
+.raw-filters { padding: 12px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.raw-filter-group { display: flex; align-items: center; gap: 6px; }
+.raw-filter-group label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+.raw-filter-select {
+  font-size: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 5px 10px; background: #fff; cursor: pointer; outline: none; font-family: inherit;
+  min-width: 160px;
+}
+.raw-filter-select:hover { border-color: var(--blue); }
+.raw-table-wrap { overflow-x: auto; overflow-y: auto; max-height: 520px; }
+.raw-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.raw-table th {
+  background: var(--navy); color: #fff; padding: 8px 12px; text-align: center;
+  font-weight: 600; font-size: 11px; letter-spacing: 0.3px;
+  white-space: nowrap; position: sticky; top: 0; z-index: 2;
+}
+.raw-table td { padding: 6px 12px; text-align: center; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.raw-table tr.group-header td {
+  background: var(--blue-pale); font-weight: 700; color: var(--navy);
+  border-top: 2px solid var(--navy-mid); font-size: 13px;
+}
+.raw-group-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.raw-desc-filter {
+  font-size: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 4px 10px; background: #fff; outline: none; font-family: inherit;
+  width: 200px; color: var(--text); font-weight: 400;
+  transition: border-color 0.15s;
+}
+.raw-desc-filter:focus { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(0,115,230,0.12); }
+.raw-desc-filter::placeholder { color: #cbd5e0; }
+.raw-table tr.group-subtotal td {
+  background: #f0f4fa; font-weight: 600; color: var(--navy-dark);
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.raw-table tr.data-row:nth-child(even) td { background: #fafbfc; }
+.raw-table tr.data-row:hover td { background: var(--blue-pale); }
+
+/* Period pickers (YoY) */
+.period-row { display: flex; gap: 20px; flex-wrap: wrap; }
+.period-col { flex: 1; min-width: 280px; }
+.period-label { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-a { background: var(--navy); }
+.dot-b { background: var(--blue); }
+.period-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.period-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+
+/* Chart */
+.chart-section { display: none; margin-top: 16px; }
+.chart-section.show { display: block; }
+.chart-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+.chart-container { width: 100%; height: 480px; }
+
+/* Detail table (YoY) */
+.detail-section { display: none; margin-top: 16px; }
+.detail-section.show { display: block; }
+.detail-card {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border); overflow: hidden;
+}
+.detail-header {
+  padding: 14px 22px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.detail-header h3 { font-size: 14px; font-weight: 600; }
+.detail-table-wrap { overflow-x: auto; padding: 4px; }
+.detail-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px; }
+.detail-table th {
+  background: var(--navy); color: #fff; padding: 9px 14px; text-align: center;
+  font-weight: 600; font-size: 11px; letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--navy-dark); white-space: nowrap; position: sticky; top: 0;
+}
+.detail-table td { padding: 8px 14px; text-align: center; border-bottom: 1px solid var(--border); white-space: nowrap; font-size: 12px; }
+.detail-table tr:nth-child(even) td { background: #f7f9fc; }
+.detail-table tr:hover td { background: var(--blue-pale); }
+th:first-child, td:first-child { text-align: left; padding-left: 18px; }
+.positive { color: var(--green); font-weight: 700; }
+.negative { color: var(--red); font-weight: 700; }
+.zero-change { color: #94a3b8; }
+
+/* Spinner / Toast */
+.spinner-overlay {
+  display: none; position: fixed; top:0; left:0; right:0; bottom:0;
+  background: rgba(255,255,255,0.7); z-index: 100;
+  align-items: center; justify-content: center;
+}
+.spinner-overlay.show { display: flex; }
+.spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--navy); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--navy); color: #fff; padding: 10px 24px; border-radius: var(--radius-sm);
+  font-size: 13px; z-index: 200; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+
+@media (max-width: 768px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .header h1 { font-size: 20px; }
+  .period-row { flex-direction: column; }
+}
+
+/* ==================== Floating Sticky Note ==================== */
+.note-toggle {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--navy); color: #fff; border: none;
+  cursor: pointer; box-shadow: 0 2px 12px rgba(0,72,157,0.3);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.note-toggle:hover { transform: scale(1.08); box-shadow: 0 4px 16px rgba(0,72,157,0.4); }
+.note-toggle svg { width: 22px; height: 22px; }
+
+.note-panel {
+  position: fixed; top: 80px; right: 24px; z-index: 10000;
+  width: 400px; height: 340px; min-width: 300px; min-height: 220px;
+  background: #fffef5; border: 1px solid #d4cd6a; border-radius: var(--radius);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12); display: none; flex-direction: column;
+  overflow: hidden;
+}
+.note-panel.show { display: flex; }
+.note-panel.minimized .note-toolbar,
+.note-panel.minimized .note-editor,
+.note-panel.minimized .note-resize { display: none; }
+.note-panel.minimized { height: auto !important; }
+
+.note-header {
+  background: var(--navy); color: #fff;
+  padding: 8px 12px; cursor: move; display: flex; align-items: center;
+  justify-content: space-between; user-select: none; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.note-header-actions { display: flex; gap: 4px; }
+.note-header-actions button {
+  background: rgba(255,255,255,0.15); border: none; color: #fff;
+  width: 22px; height: 22px; border-radius: 3px; cursor: pointer;
+  font-size: 13px; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.note-header-actions button:hover { background: rgba(255,255,255,0.3); }
+
+.note-toolbar {
+  background: #fffdf0; border-bottom: 1px solid #e0d97a;
+  padding: 6px 8px; display: flex; align-items: center; gap: 3px; flex-wrap: wrap;
+}
+.note-toolbar select {
+  font-size: 12px; border: 1px solid #d4cd6a; border-radius: 3px;
+  padding: 3px 4px; background: #fff; cursor: pointer; height: 26px; outline: none;
+}
+.note-toolbar select:hover { border-color: var(--blue); }
+.note-btn {
+  font-size: 12px; border: 1px solid #d4cd6a; border-radius: 3px;
+  width: 28px; height: 26px; display: flex; align-items: center; justify-content: center;
+  background: #fff; cursor: pointer; transition: all 0.12s; padding: 0;
+}
+.note-btn:hover { border-color: var(--blue); background: var(--blue-pale); }
+.note-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.note-color-input { width: 30px; height: 26px; padding: 2px; border: 1px solid #d4cd6a; border-radius: 3px; cursor: pointer; background: #fff; }
+.note-divider { width: 1px; height: 18px; background: #d4cd6a; margin: 0 3px; }
+
+.note-editor {
+  flex: 1; overflow-y: auto; padding: 12px 14px; outline: none;
+  font-size: 14px; line-height: 1.75; color: #333; cursor: text;
+  word-wrap: break-word;
+}
+.note-editor:empty::before { content: '在此输入汇报内容...'; color: #b0a860; font-style: italic; }
+.note-editor:focus:empty::before { opacity: 0.4; }
+
+.note-resize {
+  position: absolute; bottom: 0; right: 0; width: 18px; height: 18px;
+  cursor: nwse-resize; z-index: 10;
+}
+.note-resize::after {
+  content: ''; position: absolute; bottom: 3px; right: 3px;
+  width: 10px; height: 10px;
+  border-right: 2px solid #b0a860; border-bottom: 2px solid #b0a860;
+}
+.note-save-hint { font-size: 10px; opacity: 0.6; margin-left: auto; padding-right: 4px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>外贸订单分析平台</h1>
+  <p>上传订单数据，一站式完成透视分析与同比对比</p>
+</div>
+
+<div class="container">
+  <!-- Upload -->
+  <div class="upload-section">
+    <div class="upload-card" id="uploadCard">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <h3>上传 Excel 订单数据</h3>
+      <p class="hint">支持 .xlsx / .xls 格式，拖拽文件到此处或点击选择</p>
+      <label class="btn btn-primary" for="fileInput">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        选择文件
+      </label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+    </div>
+  </div>
+
+  <!-- File Bar -->
+  <div class="file-bar" id="fileBar">
+    <div class="file-info">
+      <div class="file-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <div>
+        <div class="file-name" id="fileName">—</div>
+        <div class="file-meta" id="fileMeta">—</div>
+      </div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="document.getElementById('fileInput').click()">更换文件</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-card"><div class="stat-value" id="statOrders">—</div><div class="stat-label">总订单行数</div></div>
+    <div class="stat-card"><div class="stat-value" id="statClients">—</div><div class="stat-label">客户数</div></div>
+    <div class="stat-card"><div class="stat-value" id="statCategories">—</div><div class="stat-label">物料分类数</div></div>
+    <div class="stat-card"><div class="stat-value" id="statMonths">—</div><div class="stat-label">覆盖月份</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-section" id="tabsSection">
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-tab="pivot" onclick="switchTab('pivot')">订单透视表</button>
+      <button class="tab-btn" data-tab="yoy" onclick="switchTab('yoy')">同比分析</button>
+    </div>
+
+    <!-- Tab 1: Pivot -->
+    <div class="tab-panel show" id="panelPivot">
+      <div class="panel-card">
+        <div class="month-chips" id="pivotMonthGrid"></div>
+        <div class="pivot-actions">
+          <span class="info" id="pivotInfo">请先上传文件</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="pivotSelectAll()">全选</button>
+            <button class="btn btn-outline btn-sm" onclick="pivotClearAll()">清空</button>
+            <button class="btn btn-primary btn-sm" onclick="pivotGenerate()">生成统计表</button>
+            <button class="btn btn-outline btn-sm" onclick="pivotExport()" style="margin-left:4px;">导出 Excel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: YoY -->
+    <div class="tab-panel" id="panelYoy">
+      <div class="panel-card">
+        <div class="period-row">
+          <div class="period-col">
+            <div class="period-label"><span class="dot dot-a"></span> 时间段 A（基准期）</div>
+            <div class="period-chips" id="chipsA"></div>
+          </div>
+          <div class="period-col">
+            <div class="period-label"><span class="dot dot-b"></span> 时间段 B（对比期）</div>
+            <div class="period-chips" id="chipsB"></div>
+          </div>
+        </div>
+        <div class="period-actions">
+          <span class="info" id="yoyInfo">请选择两个时间段</span>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-outline btn-sm" onclick="yoySelectAllA()">全选A</button>
+            <button class="btn btn-outline btn-sm" onclick="yoyClearA()">清空A</button>
+            <button class="btn btn-outline btn-sm" onclick="yoySelectAllB()">全选B</button>
+            <button class="btn btn-outline btn-sm" onclick="yoyClearB()">清空B</button>
+            <button class="btn btn-primary btn-sm" onclick="yoyGenerate()" style="margin-left:8px;">生成对比图</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pivot Table -->
+  <div class="table-section" id="pivotTableSection">
+    <div class="table-card">
+      <div class="table-header">
+        <div>
+          <h3 id="pivotTableTitle">客户 × 物料分类 订单数量</h3>
+          <span style="font-size:11px;color:var(--text-secondary);display:block;margin-top:2px;">点击客户名称可查看该客户各月份×分类明细</span>
+        </div>
+        <span class="badge" id="pivotTableBadge"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead id="pivotTableHead"></thead>
+          <tbody id="pivotTableBody"></tbody>
+          <tfoot id="pivotTableFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="empty-state" id="pivotEmptyState">
+    <p>暂无数据，请先选择月份并点击「生成统计表」</p>
+  </div>
+
+  <!-- Pivot Client Drill-down -->
+  <div class="drill-section" id="pivotDrillSection">
+    <div class="drill-card">
+      <div class="drill-header">
+        <h3 id="pivotDrillTitle">客户明细</h3>
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <span class="badge" id="pivotDrillBadge"></span>
+          <button class="drill-close-btn" onclick="pivotDrillClose()" title="关闭">&times;</button>
+        </div>
+      </div>
+      <div class="drill-body">
+        <div class="drill-table-wrap">
+          <table class="detail-table" id="pivotDrillTable">
+            <thead id="pivotDrillHead"></thead>
+            <tbody id="pivotDrillBody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+          <button class="btn btn-accent btn-sm" id="rawDataToggleBtn" onclick="pivotRawDataToggle()" style="display:inline-flex;align-items:center;gap:6px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 6-6"/></svg>
+            订单数据下钻
+          </button>
+        </div>
+        <div class="drill-chart-container" id="pivotDrillChart"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Raw Data Drill-down -->
+  <div class="raw-section" id="pivotRawSection">
+    <div class="raw-card">
+      <div class="raw-header">
+        <h3>源数据明细（按物料分类分组）</h3>
+        <button class="drill-close-btn" onclick="pivotRawClose()" title="关闭">&times;</button>
+      </div>
+      <div class="raw-filters">
+        <div class="raw-filter-group">
+          <label>客户：</label>
+          <select class="raw-filter-select" id="rawFilterClient" onchange="pivotRawRender()"></select>
+        </div>
+        <div class="raw-filter-group">
+          <label>月份：</label>
+          <select class="raw-filter-select" id="rawFilterMonth" onchange="pivotRawRender()"></select>
+        </div>
+      </div>
+      <div class="raw-table-wrap">
+        <table class="raw-table" id="rawTable">
+          <thead id="rawTableHead"></thead>
+          <tbody id="rawTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- YoY Chart -->
+  <div class="chart-section" id="yoyChartSection">
+    <div class="chart-card">
+      <div class="chart-container" id="chartContainer"></div>
+    </div>
+  </div>
+
+  <!-- YoY Detail -->
+  <div class="detail-section" id="yoyDetailSection">
+    <div class="detail-card">
+      <div class="detail-header">
+        <h3>同比变化明细</h3>
+      </div>
+      <div class="detail-table-wrap">
+        <table class="detail-table" id="yoyDetailTable">
+          <thead><tr><th>物料分类</th><th id="yoyThA">时间段A</th><th id="yoyThB">时间段B</th><th>同比变化率</th></tr></thead>
+          <tbody id="yoyDetailBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- YoY Client Detail -->
+  <div class="detail-section" id="yoyClientSection">
+    <div class="detail-card">
+      <div class="detail-header">
+        <h3>客户 × 物料分类 同比明细</h3>
+        <span class="detail-badge" id="yoyClientBadge"></span>
+      </div>
+      <div class="detail-table-wrap" style="overflow-x:auto;">
+        <table class="detail-table" id="yoyClientTable">
+          <thead id="yoyClientHead"></thead>
+          <tbody id="yoyClientBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Floating Sticky Note -->
+<button class="note-toggle" id="noteToggle" title="打开/关闭汇报便签">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="8" y1="13" x2="16" y2="13"/>
+    <line x1="8" y1="17" x2="13" y2="17"/>
+  </svg>
+</button>
+
+<div class="note-panel" id="notePanel">
+  <div class="note-header" id="noteHeader">
+    <span>汇报便签</span>
+    <div class="note-header-actions">
+      <button onclick="noteMinimize()" title="收起/展开" id="noteMinBtn">—</button>
+      <button onclick="noteClear()" title="清空">✕</button>
+    </div>
+  </div>
+  <div class="note-toolbar">
+    <select id="noteFontFamily" onchange="noteFormat('fontName', this.value)" title="字体">
+      <option value="">字体</option>
+      <option value="微软雅黑">微软雅黑</option>
+      <option value="宋体">宋体</option>
+      <option value="黑体">黑体</option>
+      <option value="楷体">楷体</option>
+      <option value="仿宋">仿宋</option>
+      <option value="Arial">Arial</option>
+      <option value="Times New Roman">Times New Roman</option>
+    </select>
+    <select id="noteFontSize" onchange="noteFormat('fontSize', this.value)" title="字号">
+      <option value="">字号</option>
+      <option value="2">12px</option>
+      <option value="3">14px</option>
+      <option value="4">18px</option>
+      <option value="5">24px</option>
+      <option value="6">32px</option>
+      <option value="7">48px</option>
+    </select>
+    <div class="note-divider"></div>
+    <button class="note-btn" onclick="noteFormat('bold')" title="加粗" style="font-weight:700;">B</button>
+    <button class="note-btn" onclick="noteFormat('italic')" title="斜体" style="font-style:italic;">I</button>
+    <button class="note-btn" onclick="noteFormat('underline')" title="下划线" style="text-decoration:underline;">U</button>
+    <div class="note-divider"></div>
+    <input type="color" class="note-color-input" id="noteColor" onchange="noteFormat('foreColor', this.value)" title="字体颜色" value="#333333">
+    <div class="note-divider"></div>
+    <button class="note-btn" onclick="noteFormat('insertUnorderedList')" title="项目符号" style="font-size:14px;">≡</button>
+    <button class="note-btn" onclick="noteFormat('justifyLeft')" title="左对齐" style="font-size:13px;">⬅</button>
+    <button class="note-btn" onclick="noteFormat('justifyCenter')" title="居中" style="font-size:13px;">↔</button>
+    <span class="note-save-hint" id="noteSaveHint">已保存</span>
+  </div>
+  <div class="note-editor" id="noteEditor" contenteditable="true"></div>
+  <div class="note-resize" id="noteResize"></div>
+</div>
+
+<div class="spinner-overlay" id="spinner"><div class="spinner"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================================================================
+   KNOWN CAT ORDER - 物料分类固定顺序
+   ================================================================ */
+var KNOWN_CAT_ORDER = ['TDI', 'MDI', 'PMDI', '改性', 'PVC', '组合聚醚', '单体聚醚'];
+
+/* ================================================================
+   Global State
+   ================================================================ */
+var gData = [];
+var gAllMonths = [];
+var gRawHeaders = [];
+var pivotSelectedMonths = {};
+var yoySelectedA = {};
+var yoySelectedB = {};
+var gPivotClients = [];
+var gPivotSelectedMonthSet = {};
+var gRawCurrentClient = '';
+var gRawCurrentMonths = [];
+var gRawDescFilters = {};
+
+/* ================================================================
+   Utility
+   ================================================================ */
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+/* ================================================================
+   Tab Switching
+   ================================================================ */
+function switchTab(tabName) {
+  var btns = document.querySelectorAll('.tab-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+  document.querySelector('.tab-btn[data-tab="' + tabName + '"]').classList.add('active');
+  document.getElementById('panelPivot').classList.remove('show');
+  document.getElementById('panelYoy').classList.remove('show');
+  if (tabName === 'pivot') {
+    document.getElementById('panelPivot').classList.add('show');
+  } else {
+    document.getElementById('panelYoy').classList.add('show');
+  }
+}
+
+/* ================================================================
+   Material Classification
+   ================================================================ */
+function classifyMaterial(desc) {
+  if (!desc) return '未知';
+  var d = String(desc).trim();
+  if (d === 'TDI') return 'TDI';
+  if (d === 'MDI' || d === 'MDI-50系列') return 'MDI';
+  if (d === 'PM') return 'PMDI';
+  if (d.indexOf('油墨') !== -1 || d.indexOf('粘合剂') !== -1 || d.indexOf('助剂') !== -1) return '改性';
+  if (d === '改性MDI') return '改性';
+  if (d === '聚氯乙烯') return 'PVC';
+  if (d.indexOf('板材干白料') !== -1 || d.indexOf('组合聚醚') !== -1 || d.indexOf('家电干白料') !== -1) return '组合聚醚';
+  var knownMonomer = ['CASE', 'POP', '天然脂肪醇醚', '小分子聚醚', '差异化聚醚', '普通软泡', '硬泡聚醚', '高回弹'];
+  if (knownMonomer.indexOf(d) !== -1) return '单体聚醚';
+  // 未知描述：以描述本身作为分类名
+  return d;
+}
+
+function sortedCats(catsSet) {
+  var result = [];
+  for (var i = 0; i < KNOWN_CAT_ORDER.length; i++) {
+    if (catsSet[KNOWN_CAT_ORDER[i]]) result.push(KNOWN_CAT_ORDER[i]);
+  }
+  var arr = [];
+  var keys = Object.keys(catsSet);
+  keys.sort();
+  for (var j = 0; j < keys.length; j++) {
+    var found = false;
+    for (var k = 0; k < KNOWN_CAT_ORDER.length; k++) {
+      if (keys[j] === KNOWN_CAT_ORDER[k]) { found = true; break; }
+    }
+    if (!found) arr.push(keys[j]);
+  }
+  return result.concat(arr);
+}
+
+/* ================================================================
+   发货月份判定
+   ================================================================ */
+var TIME_PRIORITY = ['动态ETD', '订舱反馈ETD', '订舱要求ETD', '客户要求ETD', '客户要求ETA'];
+
+function parseDate(val) {
+  if (!val) return null;
+  if (typeof val === 'number') {
+    var d = new Date((val - 25569) * 86400 * 1000);
+    return d;
+  }
+  var s = String(val).trim();
+  if (!s) return null;
+  var parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) return parsed;
+  return null;
+}
+
+function determineShipMonth(row) {
+  for (var i = 0; i < TIME_PRIORITY.length; i++) {
+    var colName = TIME_PRIORITY[i];
+    var val = row[colName];
+    if (val === undefined || val === null) continue;
+    var dt = parseDate(val);
+    if (!dt) continue;
+    if (colName === '客户要求ETA') {
+      if (dt.getDate() >= 15) {
+        return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+      } else {
+        var mm = dt.getMonth(); // 0-11
+        if (mm === 0) return (dt.getFullYear() - 1) + '-12';
+        return dt.getFullYear() + '-' + String(mm).padStart(2, '0');
+      }
+    } else {
+      return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+    }
+  }
+  return null;
+}
+
+/* ================================================================
+   Process Rows
+   ================================================================ */
+function processRows(rows) {
+  var headers = rows[0];
+  gRawHeaders = headers;
+  var headerMap = {};
+  for (var ci = 0; ci < headers.length; ci++) {
+    if (headers[ci]) headerMap[String(headers[ci]).trim()] = ci;
+  }
+
+  var descColKey = null;
+  var keys = Object.keys(headerMap);
+  for (var ki = 0; ki < keys.length; ki++) {
+    if (keys[ki].indexOf('物料组描述') !== -1) { descColKey = keys[ki]; break; }
+  }
+  var clientColIdx = headerMap['客户名称'];
+  var qtyColIdx = headerMap['订单数量'];
+
+  var result = [];
+  var monthsSetObj = {};
+
+  for (var ri = 1; ri < rows.length; ri++) {
+    var row = rows[ri];
+    var named = {};
+    var mapKeys = Object.keys(headerMap);
+    for (var mi = 0; mi < mapKeys.length; mi++) {
+      named[mapKeys[mi]] = row[headerMap[mapKeys[mi]]];
+    }
+
+    var desc = descColKey ? named[descColKey] : null;
+    var classification = classifyMaterial(desc);
+    var shipMonth = determineShipMonth(named);
+    if (shipMonth) monthsSetObj[shipMonth] = true;
+
+    var qty = 0;
+    if (qtyColIdx !== undefined && row[qtyColIdx] !== null && row[qtyColIdx] !== undefined) {
+      qty = parseFloat(row[qtyColIdx]) || 0;
+    }
+    var client = clientColIdx !== undefined ? String(row[clientColIdx] || '').trim() : '';
+
+    result.push({ client: client, classification: classification, shipMonth: shipMonth, qty: qty, raw: named, desc: desc });
+  }
+
+  gAllMonths = Object.keys(monthsSetObj).sort();
+  return result;
+}
+
+/* ================================================================
+   File Upload
+   ================================================================ */
+function handleFile(file) {
+  if (!file.name.match(/\.xlsx?$/i)) { showToast('请上传 .xlsx 或 .xls 格式的文件'); return; }
+  document.getElementById('spinner').classList.add('show');
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var bytes = new Uint8Array(e.target.result);
+      var wb = XLSX.read(bytes, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+      if (rows.length < 2) {
+        showToast('文件数据不足，请检查文件内容');
+        document.getElementById('spinner').classList.remove('show');
+        return;
+      }
+
+      gData = processRows(rows);
+
+      // Update file bar
+      document.getElementById('fileName').textContent = file.name;
+      document.getElementById('fileMeta').textContent = gData.length + ' 行数据 · ' + gAllMonths.length + ' 个月份';
+      document.getElementById('fileBar').classList.add('show');
+
+      // Stats
+      document.getElementById('statOrders').textContent = gData.length;
+      var clientCount = {}; for (var i = 0; i < gData.length; i++) { clientCount[gData[i].client] = true; }
+      document.getElementById('statClients').textContent = Object.keys(clientCount).length;
+      var catCount = {}; for (var j = 0; j < gData.length; j++) { catCount[gData[j].classification] = true; }
+      document.getElementById('statCategories').textContent = Object.keys(catCount).length;
+      document.getElementById('statMonths').textContent = gAllMonths.length;
+      document.getElementById('statsRow').classList.add('show');
+
+      // Build both pickers
+      buildPivotMonthPicker();
+      buildYoyPeriodPickers();
+
+      document.getElementById('tabsSection').classList.add('show');
+      document.getElementById('spinner').classList.remove('show');
+    } catch (err) {
+      console.error(err);
+      showToast('文件解析失败：' + err.message);
+      document.getElementById('spinner').classList.remove('show');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Drag & Drop + File Input
+var uploadCard = document.getElementById('uploadCard');
+uploadCard.addEventListener('dragover', function(e) { e.preventDefault(); uploadCard.classList.add('dragover'); });
+uploadCard.addEventListener('dragleave', function() { uploadCard.classList.remove('dragover'); });
+uploadCard.addEventListener('drop', function(e) {
+  e.preventDefault(); uploadCard.classList.remove('dragover');
+  if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+});
+document.getElementById('fileInput').addEventListener('change', function() {
+  if (this.files.length > 0) handleFile(this.files[0]);
+});
+
+/* ================================================================
+   PIVOT: Month Picker
+   ================================================================ */
+function buildPivotMonthPicker() {
+  var byYear = {};
+  for (var mi = 0; mi < gAllMonths.length; mi++) {
+    var m = gAllMonths[mi];
+    var y = m.substring(0, 4);
+    if (!byYear[y]) byYear[y] = [];
+    byYear[y].push(m);
+  }
+  var years = Object.keys(byYear).sort();
+
+  var html = '';
+  for (var yi = 0; yi < years.length; yi++) {
+    var y = years[yi];
+    byYear[y].sort();
+    html += '<div class="year-group" data-year="' + y + '">';
+    html += '<div class="year-group-title" onclick="pivotToggleYear(\'' + y + '\')">';
+    html += '<input type="checkbox" id="pivotYearCheck_' + y + '" checked onchange="pivotApplyYearCheck(\'' + y + '\', this.checked)">';
+    html += '<span class="year-label">' + y + ' 年</span>';
+    html += '<span class="year-count">' + byYear[y].length + ' 个月份</span>';
+    html += '</div>';
+    html += '<div class="month-chips">';
+    for (var mi2 = 0; mi2 < byYear[y].length; mi2++) {
+      var m2 = byYear[y][mi2];
+      var parts = m2.split('-');
+      var label = parts[0] + '年' + parseInt(parts[1]) + '月';
+      html += '<div class="month-chip selected" data-month="' + m2 + '" onclick="pivotToggleMonth(this, \'' + m2 + '\')">' + label + '</div>';
+      pivotSelectedMonths[m2] = true;
+    }
+    html += '</div></div>';
+  }
+  document.getElementById('pivotMonthGrid').innerHTML = html;
+  pivotUpdateInfo();
+}
+
+function pivotToggleMonth(chipEl, month) {
+  if (chipEl.classList.contains('selected')) {
+    chipEl.classList.remove('selected');
+    delete pivotSelectedMonths[month];
+  } else {
+    chipEl.classList.add('selected');
+    pivotSelectedMonths[month] = true;
+  }
+  var y = month.substring(0, 4);
+  var groupEl = document.querySelector('.year-group[data-year="' + y + '"]');
+  if (groupEl) {
+    var chips = groupEl.querySelectorAll('.month-chip');
+    var allChecked = true;
+    for (var i = 0; i < chips.length; i++) {
+      if (!chips[i].classList.contains('selected')) { allChecked = false; break; }
+    }
+    document.getElementById('pivotYearCheck_' + y).checked = allChecked;
+  }
+  pivotUpdateInfo();
+}
+
+function pivotToggleYear(year) {
+  var cb = document.getElementById('pivotYearCheck_' + year);
+  cb.checked = !cb.checked;
+  pivotApplyYearCheck(year, cb.checked);
+}
+
+function pivotApplyYearCheck(year, checked) {
+  var groupEl = document.querySelector('.year-group[data-year="' + year + '"]');
+  if (!groupEl) return;
+  var chips = groupEl.querySelectorAll('.month-chip');
+  for (var i = 0; i < chips.length; i++) {
+    var m = chips[i].getAttribute('data-month');
+    if (checked) {
+      chips[i].classList.add('selected');
+      pivotSelectedMonths[m] = true;
+    } else {
+      chips[i].classList.remove('selected');
+      delete pivotSelectedMonths[m];
+    }
+  }
+  pivotUpdateInfo();
+}
+
+function pivotSelectAll() {
+  pivotSelectedMonths = {};
+  var chips = document.querySelectorAll('#pivotMonthGrid .month-chip');
+  for (var i = 0; i < chips.length; i++) {
+    chips[i].classList.add('selected');
+    pivotSelectedMonths[chips[i].getAttribute('data-month')] = true;
+  }
+  var checks = document.querySelectorAll('#pivotMonthGrid input[type="checkbox"]');
+  for (var j = 0; j < checks.length; j++) checks[j].checked = true;
+  pivotUpdateInfo();
+  showToast('已全选所有月份');
+}
+
+function pivotClearAll() {
+  pivotSelectedMonths = {};
+  var chips = document.querySelectorAll('#pivotMonthGrid .month-chip');
+  for (var i = 0; i < chips.length; i++) chips[i].classList.remove('selected');
+  var checks = document.querySelectorAll('#pivotMonthGrid input[type="checkbox"]');
+  for (var j = 0; j < checks.length; j++) checks[j].checked = false;
+  pivotUpdateInfo();
+  showToast('已清空所有选择');
+}
+
+function pivotUpdateInfo() {
+  var count = Object.keys(pivotSelectedMonths).length;
+  var el = document.getElementById('pivotInfo');
+  if (count === 0) el.innerHTML = '已选择 <strong>0</strong> 个月份 · 请至少选择一个月';
+  else if (count === 1) el.innerHTML = '已选择 <strong>' + count + '</strong> 个月份 · 单月统计';
+  else el.innerHTML = '已选择 <strong>' + count + '</strong> 个月份 · 合并统计中…';
+}
+
+/* ================================================================
+   PIVOT: Generate Table
+   ================================================================ */
+function pivotGenerate() {
+  var monthsArr = Object.keys(pivotSelectedMonths).sort();
+  if (monthsArr.length === 0) {
+    document.getElementById('pivotTableSection').classList.remove('show');
+    document.getElementById('pivotEmptyState').classList.add('show');
+    document.getElementById('pivotDrillSection').classList.remove('show');
+    document.getElementById('pivotRawSection').classList.remove('show');
+    return;
+  }
+
+  var monthSet = {};
+  for (var i = 0; i < monthsArr.length; i++) monthSet[monthsArr[i]] = true;
+
+  var filtered = [];
+  for (var j = 0; j < gData.length; j++) {
+    if (monthSet[gData[j].shipMonth]) filtered.push(gData[j]);
+  }
+
+  var clientsSet = {};
+  var catsSet = {};
+  var pivot = {};
+  for (var k = 0; k < filtered.length; k++) {
+    var d = filtered[k];
+    clientsSet[d.client] = true;
+    catsSet[d.classification] = true;
+    if (!pivot[d.client]) pivot[d.client] = {};
+    pivot[d.client][d.classification] = (pivot[d.client][d.classification] || 0) + d.qty;
+  }
+
+  var clients = Object.keys(clientsSet).sort();
+  var cats = sortedCats(catsSet);
+
+  // Store for drill-down
+  gPivotClients = clients;
+  gPivotSelectedMonthSet = monthSet;
+
+  // Title
+  var monthLabel = '';
+  if (monthsArr.length === 1) monthLabel = monthsArr[0];
+  else {
+    var byY = {};
+    for (var mi = 0; mi < monthsArr.length; mi++) {
+      var y = monthsArr[mi].substring(0, 4);
+      if (!byY[y]) byY[y] = [];
+      byY[y].push(monthsArr[mi].substring(5));
+    }
+    var parts = [];
+    Object.keys(byY).sort().forEach(function(yr) { parts.push(yr + '年(' + byY[yr].length + '个月)'); });
+    monthLabel = parts.join(' & ');
+  }
+  document.getElementById('pivotTableTitle').textContent = monthLabel + ' 客户 × 物料分类 订单数量';
+  document.getElementById('pivotTableBadge').textContent = clients.length + ' 个客户 · ' + filtered.length + ' 行订单';
+
+  // Header
+  var thead = document.getElementById('pivotTableHead');
+  var headHTML = '<tr><th>客户名称</th>';
+  for (var ci = 0; ci < cats.length; ci++) headHTML += '<th>' + escapeHtml(cats[ci]) + '</th>';
+  headHTML += '<th class="col-total">合计</th></tr>';
+  thead.innerHTML = headHTML;
+
+  // Body
+  var tbody = document.getElementById('pivotTableBody');
+  var bodyHTML = '';
+  var colTotals = {};
+  for (var cj = 0; cj < cats.length; cj++) colTotals[cats[cj]] = 0;
+  var grandTotal = 0;
+  // Hide previous drill-down
+  document.getElementById('pivotDrillSection').classList.remove('show');
+  document.getElementById('pivotRawSection').classList.remove('show');
+  for (var cl = 0; cl < clients.length; cl++) {
+    var client = clients[cl];
+    bodyHTML += '<tr><td class="client-link" onclick="pivotClientDrillDown(' + cl + ')">' + escapeHtml(client) + '</td>';
+    var rowTotal = 0;
+    for (var ck = 0; ck < cats.length; ck++) {
+      var val = (pivot[client] && pivot[client][cats[ck]]) ? pivot[client][cats[ck]] : 0;
+      rowTotal += val;
+      colTotals[cats[ck]] += val;
+      bodyHTML += val > 0 ? '<td>' + val.toFixed(2) + '</td>' : '<td class="zero-val">—</td>';
+    }
+    grandTotal += rowTotal;
+    bodyHTML += '<td class="col-total">' + rowTotal.toFixed(2) + '</td></tr>';
+  }
+  tbody.innerHTML = bodyHTML;
+
+  // Footer
+  var tfoot = document.getElementById('pivotTableFoot');
+  var footHTML = '<tr><td>合计</td>';
+  for (var cm = 0; cm < cats.length; cm++) footHTML += '<td>' + colTotals[cats[cm]].toFixed(2) + '</td>';
+  footHTML += '<td class="col-total">' + grandTotal.toFixed(2) + '</td></tr>';
+  tfoot.innerHTML = footHTML;
+
+  document.getElementById('pivotTableSection').classList.add('show');
+  document.getElementById('pivotEmptyState').classList.remove('show');
+}
+
+/* ================================================================
+   PIVOT: Export Excel
+   ================================================================ */
+function pivotExport() {
+  var monthsArr = Object.keys(pivotSelectedMonths).sort();
+  if (monthsArr.length === 0) { showToast('请先选择月份再导出'); return; }
+
+  var monthSet = {};
+  for (var i = 0; i < monthsArr.length; i++) monthSet[monthsArr[i]] = true;
+  var filtered = [];
+  for (var j = 0; j < gData.length; j++) {
+    if (monthSet[gData[j].shipMonth]) filtered.push(gData[j]);
+  }
+
+  var clientsSet = {};
+  var catsSet = {};
+  var pivot = {};
+  for (var k = 0; k < filtered.length; k++) {
+    var d = filtered[k];
+    clientsSet[d.client] = true;
+    catsSet[d.classification] = true;
+    if (!pivot[d.client]) pivot[d.client] = {};
+    pivot[d.client][d.classification] = (pivot[d.client][d.classification] || 0) + d.qty;
+  }
+  var clients = Object.keys(clientsSet).sort();
+  var cats = sortedCats(catsSet);
+
+  var exportData = [];
+  exportData.push(['客户名称'].concat(cats).concat(['合计']));
+  var colTotals = {};
+  for (var ci = 0; ci < cats.length; ci++) colTotals[cats[ci]] = 0;
+  var grandTotal = 0;
+  for (var cl = 0; cl < clients.length; cl++) {
+    var row = [clients[cl]];
+    var rowTotal = 0;
+    for (var cm = 0; cm < cats.length; cm++) {
+      var val = (pivot[clients[cl]] && pivot[clients[cl]][cats[cm]]) ? pivot[clients[cl]][cats[cm]] : 0;
+      row.push(val);
+      rowTotal += val;
+      colTotals[cats[cm]] += val;
+    }
+    grandTotal += rowTotal;
+    row.push(rowTotal);
+    exportData.push(row);
+  }
+  var footer = ['合计'];
+  for (var cn = 0; cn < cats.length; cn++) footer.push(colTotals[cats[cn]]);
+  footer.push(grandTotal);
+  exportData.push(footer);
+
+  var ws = XLSX.utils.aoa_to_sheet(exportData);
+  ws['!cols'] = [{ wch: 30 }].concat(cats.map(function() { return { wch: 12 }; })).concat([{ wch: 12 }]);
+  var wb = XLSX.utils.book_new();
+  var sheetLabel = monthsArr.length > 1 ? monthsArr[0] + '~' + monthsArr[monthsArr.length - 1] + '合并' : monthsArr[0];
+  XLSX.utils.book_append_sheet(wb, ws, sheetLabel);
+  XLSX.writeFile(wb, '外贸订单透视分析_' + sheetLabel + '.xlsx');
+}
+
+/* ================================================================
+   PIVOT: Client Drill-down
+   ================================================================ */
+function pivotDrillClose() {
+  document.getElementById('pivotDrillSection').classList.remove('show');
+  document.getElementById('pivotRawSection').classList.remove('show');
+  if (window._drillChart) { echarts.dispose(window._drillChart); window._drillChart = null; }
+}
+
+function pivotClientDrillDown(idx) {
+  var client = gPivotClients[idx];
+  if (!client) return;
+
+  gRawCurrentClient = client;
+  // Reset raw data section
+  document.getElementById('pivotRawSection').classList.remove('show');
+  gRawDescFilters = {};
+  document.getElementById('rawDataToggleBtn').innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 6-6"/></svg> 订单数据下钻';
+
+  // Filter data for this client and selected months
+  var filtered = [];
+  for (var i = 0; i < gData.length; i++) {
+    if (gData[i].client === client && gPivotSelectedMonthSet[gData[i].shipMonth]) {
+      filtered.push(gData[i]);
+    }
+  }
+  if (filtered.length === 0) { showToast('该客户在所选月份无数据'); return; }
+
+  // Collect months and categories
+  var monthsSet = {}, catsSet = {};
+  for (var j = 0; j < filtered.length; j++) {
+    monthsSet[filtered[j].shipMonth] = true;
+    catsSet[filtered[j].classification] = true;
+  }
+  var months = Object.keys(monthsSet).sort();
+  var cats = sortedCats(catsSet);
+
+  // Build pivot: month -> cat -> qty
+  var pivot = {};
+  for (var mi = 0; mi < months.length; mi++) {
+    pivot[months[mi]] = {};
+    for (var ci = 0; ci < cats.length; ci++) pivot[months[mi]][cats[ci]] = 0;
+  }
+  for (var k = 0; k < filtered.length; k++) {
+    pivot[filtered[k].shipMonth][filtered[k].classification] += filtered[k].qty;
+  }
+
+  // Title & badge
+  document.getElementById('pivotDrillTitle').textContent = client + ' — 各月份 × 物料分类 订单数量';
+  document.getElementById('pivotDrillBadge').textContent = months.length + ' 个月份 · ' + cats.length + ' 个分类';
+
+  // Table header
+  var thead = document.getElementById('pivotDrillHead');
+  var headHTML = '<tr><th>月份</th>';
+  for (var ci2 = 0; ci2 < cats.length; ci2++) headHTML += '<th>' + escapeHtml(cats[ci2]) + '</th>';
+  headHTML += '<th class="col-total">合计</th></tr>';
+  thead.innerHTML = headHTML;
+
+  // Table body + footer
+  var tbody = document.getElementById('pivotDrillBody');
+  var bodyHTML = '';
+  var colTotals = {};
+  for (var ct = 0; ct < cats.length; ct++) colTotals[cats[ct]] = 0;
+  var grandTotal = 0;
+  for (var mi2 = 0; mi2 < months.length; mi2++) {
+    var m = months[mi2];
+    var parts = m.split('-');
+    var label = parts[0] + '年' + parseInt(parts[1]) + '月';
+    bodyHTML += '<tr><td style="font-weight:500;">' + label + '</td>';
+    var rowTotal = 0;
+    for (var ck = 0; ck < cats.length; ck++) {
+      var val = pivot[m][cats[ck]];
+      rowTotal += val;
+      colTotals[cats[ck]] += val;
+      bodyHTML += val > 0 ? '<td>' + val.toFixed(2) + '</td>' : '<td class="zero-val">—</td>';
+    }
+    grandTotal += rowTotal;
+    bodyHTML += '<td class="col-total">' + rowTotal.toFixed(2) + '</td></tr>';
+  }
+  // Footer row
+  bodyHTML += '<tr><td style="font-weight:700;">合计</td>';
+  for (var cf = 0; cf < cats.length; cf++) {
+    bodyHTML += '<td style="font-weight:700;">' + colTotals[cats[cf]].toFixed(2) + '</td>';
+  }
+  bodyHTML += '<td class="col-total">' + grandTotal.toFixed(2) + '</td></tr>';
+  tbody.innerHTML = bodyHTML;
+
+  // Show section
+  document.getElementById('pivotDrillSection').classList.add('show');
+
+  // Chart
+  setTimeout(function() {
+    try {
+      var chartDom = document.getElementById('pivotDrillChart');
+      if (window._drillChart) { echarts.dispose(window._drillChart); window._drillChart = null; }
+      var chart = echarts.init(chartDom, null, { renderer: 'canvas' });
+
+      var monthLabels = months.map(function(m) {
+        var p = m.split('-');
+        return p[0] + '.' + p[1];
+      });
+
+      var palette = ['#00489D', '#E74C3C', '#27AE60', '#F39C12', '#8E44AD', '#16A085', '#2980B9', '#E67E22', '#D4385D', '#34495E'];
+      var series = [];
+      for (var si = 0; si < cats.length; si++) {
+        var data = [];
+        for (var di = 0; di < months.length; di++) {
+          data.push(Math.round(pivot[months[di]][cats[si]] * 100) / 100);
+        }
+        series.push({
+          name: cats[si],
+          type: 'line',
+          data: data,
+          symbol: 'circle',
+          symbolSize: 7,
+          lineStyle: { width: 2 },
+          itemStyle: { color: palette[si % palette.length] },
+          smooth: false,
+          label: { show: true, position: 'top', fontSize: 9,
+            formatter: function(p) { return p.value > 0 ? p.value.toFixed(0) : ''; }
+          }
+        });
+      }
+
+      var option = {
+        tooltip: { trigger: 'axis', backgroundColor: 'rgba(0,72,157,0.92)', borderColor: '#00489D', textStyle: { color: '#fff', fontSize: 12 } },
+        legend: { top: 5, textStyle: { fontSize: 11, color: '#4a5568' } },
+        grid: { left: '3%', right: '4%', bottom: '3%', top: 50, containLabel: true },
+        xAxis: { type: 'category', data: monthLabels, axisLine: { lineStyle: { color: '#cbd5e0' } }, axisLabel: { fontSize: 11, color: '#64748b' }, axisTick: { lineStyle: { color: '#cbd5e0' } } },
+        yAxis: { type: 'value', name: '订单数量', nameTextStyle: { fontSize: 11, color: '#64748b' }, axisLabel: { fontSize: 11, color: '#64748b' }, splitLine: { lineStyle: { color: '#edf2f7' } }, axisLine: { show: false }, axisTick: { show: false } },
+        series: series
+      };
+
+      chart.setOption(option);
+      window._drillChart = chart;
+    } catch (e) {
+      console.error('[下钻图表] 渲染失败：', e);
+      document.getElementById('pivotDrillChart').innerHTML = '<div style="padding:40px;text-align:center;color:#e74c3c;">图表渲染失败：' + e.message + '</div>';
+    }
+  }, 80);
+
+  // Scroll into view
+  setTimeout(function() {
+    document.getElementById('pivotDrillSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 120);
+}
+
+/* ================================================================
+   PIVOT: Raw Data Drill-down — 源数据下钻
+   ================================================================ */
+function pivotRawDataToggle() {
+  var sec = document.getElementById('pivotRawSection');
+  if (sec.classList.contains('show')) {
+    pivotRawClose();
+    return;
+  }
+
+  // Populate client dropdown
+  var clientSel = document.getElementById('rawFilterClient');
+  var clientOpts = '<option value="">全部客户</option>';
+  for (var ci = 0; ci < gPivotClients.length; ci++) {
+    clientOpts += '<option value="' + escapeHtml(gPivotClients[ci]) + '">' + escapeHtml(gPivotClients[ci]) + '</option>';
+  }
+  clientSel.innerHTML = clientOpts;
+
+  // Pre-select current drill-down client if available
+  if (gRawCurrentClient) {
+    clientSel.value = gRawCurrentClient;
+  }
+
+  // Populate month dropdown
+  var monthSel = document.getElementById('rawFilterMonth');
+  var monthsArr = Object.keys(gPivotSelectedMonthSet).sort();
+  var monthOpts = '<option value="">全部月份</option>';
+  for (var mi = 0; mi < monthsArr.length; mi++) {
+    var parts = monthsArr[mi].split('-');
+    var label = parts[0] + '年' + parseInt(parts[1]) + '月';
+    monthOpts += '<option value="' + monthsArr[mi] + '">' + label + '</option>';
+  }
+  monthSel.innerHTML = monthOpts;
+
+  sec.classList.add('show');
+  var btn = document.getElementById('rawDataToggleBtn');
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 6-6"/></svg> 收起源数据';
+  pivotRawRender();
+}
+
+function pivotRawClose() {
+  document.getElementById('pivotRawSection').classList.remove('show');
+  gRawDescFilters = {};
+  var btn = document.getElementById('rawDataToggleBtn');
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3v18h18"/><path d="M7 14l3-3 4 4 6-6"/></svg> 订单数据下钻';
+}
+
+function pivotRawDescFilter(catName, val) {
+  gRawDescFilters[catName] = val;
+  pivotRawRender();
+  // Restore focus to the filter input after re-render
+  setTimeout(function() {
+    var inputs = document.querySelectorAll('.raw-desc-filter');
+    for (var i = 0; i < inputs.length; i++) {
+      if (inputs[i].value === val) {
+        inputs[i].focus();
+        // Move cursor to end
+        var len = inputs[i].value.length;
+        inputs[i].setSelectionRange(len, len);
+        break;
+      }
+    }
+  }, 0);
+}
+
+function pivotRawRender() {
+  var selClient = document.getElementById('rawFilterClient').value;
+  var selMonth = document.getElementById('rawFilterMonth').value;
+
+  // Filter data
+  var filtered = [];
+  for (var i = 0; i < gData.length; i++) {
+    if (gPivotSelectedMonthSet[gData[i].shipMonth]) {
+      if (selClient && gData[i].client !== selClient) continue;
+      if (selMonth && gData[i].shipMonth !== selMonth) continue;
+      filtered.push(gData[i]);
+    }
+  }
+
+  if (filtered.length === 0) {
+    document.getElementById('rawTableHead').innerHTML = '';
+    document.getElementById('rawTableBody').innerHTML = '<tr><td style="padding:40px;text-align:center;color:var(--text-secondary);">无匹配数据</td></tr>';
+    return;
+  }
+
+  // Determine columns to show
+  var colDefs = [
+    { key: 'client', label: '客户名称' },
+    { key: 'classification', label: '物料分类' },
+    { key: 'shipMonth', label: '发货月份' },
+    { key: 'qty', label: '订单数量' }
+  ];
+  // Insert 物料描述 after 客户名称 if the column exists in source data
+  for (var hi0 = 0; hi0 < gRawHeaders.length; hi0++) {
+    if (gRawHeaders[hi0] && String(gRawHeaders[hi0]).trim() === '物料描述') {
+      colDefs.splice(1, 0, { key: 'raw.物料描述', label: '物料描述', rawKey: '物料描述' });
+      break;
+    }
+  }
+  // Add other raw columns that exist (单价, 币种, 销售订单号, etc.)
+  var extraCols = ['销售订单号', '销售订单', 'SO号', '销售单号', '单价', '币种', '货币', '订单金额', '交货方式'];
+  for (var ei = 0; ei < extraCols.length; ei++) {
+    for (var hi = 0; hi < gRawHeaders.length; hi++) {
+      if (gRawHeaders[hi] && String(gRawHeaders[hi]).trim() === extraCols[ei]) {
+        var colName = String(gRawHeaders[hi]).trim();
+        colDefs.push({ key: 'raw.' + colName, label: colName, rawKey: colName });
+        break;
+      }
+    }
+  }
+
+  // Group by classification
+  var catGroups = {};
+  var catSet = {};
+  for (var fi = 0; fi < filtered.length; fi++) {
+    var cat = filtered[fi].classification;
+    if (!catGroups[cat]) catGroups[cat] = [];
+    catGroups[cat].push(filtered[fi]);
+    catSet[cat] = true;
+  }
+  var sortedCatsList = sortedCats(catSet);
+
+  // Render header
+  var thead = document.getElementById('rawTableHead');
+  var headHTML = '<tr>';
+  for (var cd = 0; cd < colDefs.length; cd++) headHTML += '<th>' + escapeHtml(colDefs[cd].label) + '</th>';
+  headHTML += '</tr>';
+  thead.innerHTML = headHTML;
+
+  // Render body
+  var tbody = document.getElementById('rawTableBody');
+  var bodyHTML = '';
+  var grandTotal = 0;
+
+  for (var cg = 0; cg < sortedCatsList.length; cg++) {
+    var catName = sortedCatsList[cg];
+    var groupRows = catGroups[catName];
+
+    // Apply per-group description filter
+    var descFilter = (gRawDescFilters[catName] || '').toLowerCase().trim();
+    var displayRows = [];
+    for (var df = 0; df < groupRows.length; df++) {
+      if (descFilter) {
+        var descVal = groupRows[df].raw ? String(groupRows[df].raw['物料描述'] || groupRows[df].desc || '') : '';
+        if (descVal.toLowerCase().indexOf(descFilter) === -1) continue;
+      }
+      displayRows.push(groupRows[df]);
+    }
+
+    var groupTotal = 0;
+
+    // Group header row with filter input
+    var filterVal = escapeHtml(gRawDescFilters[catName] || '');
+    bodyHTML += '<tr class="group-header"><td colspan="' + colDefs.length + '">';
+    bodyHTML += '<div class="raw-group-bar">';
+    bodyHTML += '<span>' + escapeHtml(catName) + ' (' + displayRows.length + '/' + groupRows.length + ' 行)</span>';
+    bodyHTML += '<input type="text" class="raw-desc-filter" placeholder="输入物料描述筛选..." value="' + filterVal + '" oninput="pivotRawDescFilter(\'' + catName.replace(/'/g, "\\'") + '\', this.value)">';
+    bodyHTML += '</div>';
+    bodyHTML += '</td></tr>';
+
+    // Data rows
+    for (var gr = 0; gr < displayRows.length; gr++) {
+      var d = displayRows[gr];
+      bodyHTML += '<tr class="data-row">';
+      for (var dc = 0; dc < colDefs.length; dc++) {
+        var colDef = colDefs[dc];
+        var val = '';
+        if (colDef.key === 'client') val = d.client;
+        else if (colDef.key === 'classification') val = d.classification;
+        else if (colDef.key === 'shipMonth') {
+          if (d.shipMonth) {
+            var p = d.shipMonth.split('-');
+            val = p[0] + '年' + parseInt(p[1]) + '月';
+          } else val = '未知';
+        }
+        else if (colDef.key === 'qty') {
+          val = d.qty.toFixed(2);
+          groupTotal += d.qty;
+        }
+        else if (colDef.rawKey) {
+          var rawVal = d.raw ? d.raw[colDef.rawKey] : null;
+          val = rawVal != null ? String(rawVal) : '';
+        }
+        bodyHTML += '<td>' + escapeHtml(val) + '</td>';
+      }
+      bodyHTML += '</tr>';
+    }
+
+    grandTotal += groupTotal;
+
+    // Subtotal row
+    bodyHTML += '<tr class="group-subtotal">';
+    bodyHTML += '<td>小计</td>';
+    for (var sc = 1; sc < colDefs.length; sc++) {
+      if (colDefs[sc].key === 'qty') {
+        bodyHTML += '<td>' + groupTotal.toFixed(2) + '</td>';
+      } else {
+        bodyHTML += '<td></td>';
+      }
+    }
+    bodyHTML += '</tr>';
+  }
+
+  // Grand total row
+  bodyHTML += '<tr class="group-subtotal" style="background:var(--blue-pale);">';
+  bodyHTML += '<td style="font-weight:700;">总计</td>';
+  for (var gc = 1; gc < colDefs.length; gc++) {
+    if (colDefs[gc].key === 'qty') {
+      bodyHTML += '<td style="font-weight:700;">' + grandTotal.toFixed(2) + '</td>';
+    } else {
+      bodyHTML += '<td></td>';
+    }
+  }
+  bodyHTML += '</tr>';
+
+  tbody.innerHTML = bodyHTML;
+}
+
+/* ================================================================
+   YoY: Period Pickers
+   ================================================================ */
+function buildYoyPeriodPickers() {
+  var byYear = {};
+  for (var mi = 0; mi < gAllMonths.length; mi++) {
+    var m = gAllMonths[mi];
+    var y = m.substring(0, 4);
+    if (!byYear[y]) byYear[y] = [];
+    byYear[y].push(m);
+  }
+  var years = Object.keys(byYear).sort();
+
+  var htmlA = '', htmlB = '';
+  for (var yi = 0; yi < years.length; yi++) {
+    var y = years[yi];
+    byYear[y].sort();
+    htmlA += '<div class="year-label">' + y + '年</div>';
+    htmlB += '<div class="year-label">' + y + '年</div>';
+    for (var mi2 = 0; mi2 < byYear[y].length; mi2++) {
+      var m2 = byYear[y][mi2];
+      var parts = m2.split('-');
+      var label = parts[0] + '年' + parseInt(parts[1]) + '月';
+      htmlA += '<div class="month-chip" data-month="' + m2 + '" onclick="yoyToggleChipA(this, \'' + m2 + '\')">' + label + '</div>';
+      htmlB += '<div class="month-chip" data-month="' + m2 + '" onclick="yoyToggleChipB(this, \'' + m2 + '\')">' + label + '</div>';
+    }
+  }
+  document.getElementById('chipsA').innerHTML = htmlA;
+  document.getElementById('chipsB').innerHTML = htmlB;
+}
+
+function yoyToggleChipA(chipEl, month) {
+  if (chipEl.classList.contains('selected')) {
+    chipEl.classList.remove('selected');
+    delete yoySelectedA[month];
+  } else {
+    chipEl.classList.add('selected');
+    yoySelectedA[month] = true;
+  }
+  yoyUpdateInfo();
+}
+
+function yoyToggleChipB(chipEl, month) {
+  if (chipEl.classList.contains('selected')) {
+    chipEl.classList.remove('selected');
+    delete yoySelectedB[month];
+  } else {
+    chipEl.classList.add('selected');
+    yoySelectedB[month] = true;
+  }
+  yoyUpdateInfo();
+}
+
+function yoySelectAllA() {
+  yoySelectedA = {};
+  var chips = document.querySelectorAll('#chipsA .month-chip');
+  for (var i = 0; i < chips.length; i++) {
+    chips[i].classList.add('selected');
+    yoySelectedA[chips[i].getAttribute('data-month')] = true;
+  }
+  yoyUpdateInfo();
+}
+
+function yoyClearA() {
+  yoySelectedA = {};
+  var chips = document.querySelectorAll('#chipsA .month-chip');
+  for (var i = 0; i < chips.length; i++) chips[i].classList.remove('selected');
+  yoyUpdateInfo();
+}
+
+function yoySelectAllB() {
+  yoySelectedB = {};
+  var chips = document.querySelectorAll('#chipsB .month-chip');
+  for (var i = 0; i < chips.length; i++) {
+    chips[i].classList.add('selected');
+    yoySelectedB[chips[i].getAttribute('data-month')] = true;
+  }
+  yoyUpdateInfo();
+}
+
+function yoyClearB() {
+  yoySelectedB = {};
+  var chips = document.querySelectorAll('#chipsB .month-chip');
+  for (var i = 0; i < chips.length; i++) chips[i].classList.remove('selected');
+  yoyUpdateInfo();
+}
+
+function yoyUpdateInfo() {
+  var countA = Object.keys(yoySelectedA).length;
+  var countB = Object.keys(yoySelectedB).length;
+  var el = document.getElementById('yoyInfo');
+  if (countA === 0 && countB === 0) el.textContent = '请选择时间段A和时间段B';
+  else if (countA > 0 && countB === 0) el.textContent = '已选A: ' + countA + '个月，请选择时间段B';
+  else if (countA === 0 && countB > 0) el.textContent = '已选B: ' + countB + '个月，请选择时间段A';
+  else el.textContent = '已选A: ' + countA + '个月，B: ' + countB + '个月，可生成对比图';
+}
+
+/* ================================================================
+   YoY: Generate Chart
+   ================================================================ */
+function yoyGenerate() {
+  // Reset previous results
+  document.getElementById('yoyChartSection').classList.remove('show');
+  document.getElementById('yoyDetailSection').classList.remove('show');
+  document.getElementById('yoyClientSection').classList.remove('show');
+
+  var aKeys = Object.keys(yoySelectedA);
+  var bKeys = Object.keys(yoySelectedB);
+  if (aKeys.length === 0 || bKeys.length === 0) {
+    showToast('请同时选择时间段A和时间段B');
+    return;
+  }
+
+  document.getElementById('spinner').classList.add('show');
+  setTimeout(function() {
+    try {
+      // Build category set
+      var catsSet = {};
+      for (var di = 0; di < gData.length; di++) {
+        if (yoySelectedA[gData[di].shipMonth] || yoySelectedB[gData[di].shipMonth]) {
+          catsSet[gData[di].classification] = true;
+        }
+      }
+
+      var catsArr = sortedCats(catsSet);
+
+      // Compute quantities
+      var qtyA = {}, qtyB = {};
+      for (var ci = 0; ci < catsArr.length; ci++) { qtyA[catsArr[ci]] = 0; qtyB[catsArr[ci]] = 0; }
+      for (var dj = 0; dj < gData.length; dj++) {
+        if (yoySelectedA[gData[dj].shipMonth]) qtyA[gData[dj].classification] += gData[dj].qty;
+        if (yoySelectedB[gData[dj].shipMonth]) qtyB[gData[dj].classification] += gData[dj].qty;
+      }
+
+      // Change rates
+      var rates = [];
+      for (var ck = 0; ck < catsArr.length; ck++) {
+        var a = qtyA[catsArr[ck]], b = qtyB[catsArr[ck]];
+        if (a === 0 && b === 0) rates.push(0);
+        else if (a === 0) rates.push(100);
+        else rates.push(Math.round(((b - a) / a * 100) * 10) / 10);
+      }
+
+      var labelA = yoyFormatPeriodLabel(Object.keys(yoySelectedA));
+      var labelB = yoyFormatPeriodLabel(Object.keys(yoySelectedB));
+
+      // Save detail
+      yoyDetailData = [];
+      for (var cl = 0; cl < catsArr.length; cl++) {
+        yoyDetailData.push({
+          cat: catsArr[cl],
+          qa: Math.round(qtyA[catsArr[cl]] * 100) / 100,
+          qb: Math.round(qtyB[catsArr[cl]] * 100) / 100,
+          rate: rates[cl]
+        });
+      }
+
+      // ECharts
+      var chartDom = document.getElementById('chartContainer');
+      if (window._myChart) { echarts.dispose(window._myChart); window._myChart = null; }
+      var myChart = echarts.init(chartDom, null, { renderer: 'canvas' });
+
+      var barDataA = [], barDataB = [];
+      for (var cm = 0; cm < catsArr.length; cm++) {
+        barDataA.push(Math.round(qtyA[catsArr[cm]] * 100) / 100);
+        barDataB.push(Math.round(qtyB[catsArr[cm]] * 100) / 100);
+      }
+
+      var option = {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          backgroundColor: 'rgba(0,72,157,0.92)', borderColor: '#00489D', textStyle: { color: '#fff', fontSize: 12 },
+          formatter: function(params) {
+            var s = '<b>' + params[0].name + '</b><br/>';
+            for (var pi = 0; pi < params.length; pi++) {
+              var p = params[pi];
+              if (p.seriesName === '同比变化率(%)') {
+                var col = p.value >= 0 ? '#16a34a' : '#dc2626';
+                s += '<span style="color:' + col + '">●</span> ' + p.seriesName + '：<b>' + (p.value >= 0 ? '+' : '') + p.value + '%</b><br/>';
+              } else {
+                s += '<span style="color:' + p.color + '">●</span> ' + p.seriesName + '：<b>' + p.value.toFixed(2) + '</b><br/>';
+              }
+            }
+            return s;
+          }
+        },
+        legend: { data: [labelA, labelB, '同比变化率(%)'], top: 8, textStyle: { fontSize: 12, color: '#4a5568' } },
+        grid: { left: '3%', right: '8%', bottom: '3%', top: 60, containLabel: true },
+        xAxis: {
+          type: 'category', data: catsArr,
+          axisLine: { lineStyle: { color: '#cbd5e0' } },
+          axisLabel: { fontSize: 11, color: '#64748b', interval: 0, rotate: catsArr.length > 8 ? 20 : 0 },
+          axisTick: { lineStyle: { color: '#cbd5e0' } }
+        },
+        yAxis: [
+          { type: 'value', name: '订单数量', nameTextStyle: { fontSize: 11, color: '#64748b' }, axisLabel: { fontSize: 11, color: '#64748b' }, splitLine: { lineStyle: { color: '#edf2f7' } }, axisLine: { show: false }, axisTick: { show: false } },
+          { type: 'value', name: '同比变化率(%)', nameTextStyle: { fontSize: 11, color: '#64748b' }, axisLabel: { fontSize: 11, color: '#64748b', formatter: '{value}%' }, splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false } }
+        ],
+        series: [
+          {
+            name: labelA, type: 'bar', data: barDataA,
+            barWidth: catsArr.length > 10 ? '30%' : '40%',
+            itemStyle: { color: '#00489D', borderRadius: [2, 2, 0, 0] },
+            label: { show: true, position: 'top', fontSize: 10, color: '#64748b',
+              formatter: function(p) { return p.value > 0 ? p.value.toFixed(1) : ''; }
+            }
+          },
+          {
+            name: labelB, type: 'bar', data: barDataB,
+            barWidth: catsArr.length > 10 ? '30%' : '40%',
+            itemStyle: { color: '#0073e6', borderRadius: [2, 2, 0, 0] },
+            label: { show: true, position: 'top', fontSize: 10, color: '#64748b',
+              formatter: function(p) { return p.value > 0 ? p.value.toFixed(1) : ''; }
+            }
+          },
+          {
+            name: '同比变化率(%)', type: 'line', yAxisIndex: 1, data: rates,
+            symbol: 'circle', symbolSize: 7,
+            itemStyle: { color: '#c8860d' },
+            lineStyle: { width: 2 },
+            label: {
+              show: true, position: 'top', fontSize: 10, color: '#64748b',
+              formatter: function(p) { return (p.value >= 0 ? '+' : '') + p.value + '%'; }
+            }
+          }
+        ]
+      };
+
+      myChart.setOption(option);
+      window._myChart = myChart;
+
+      // Detail table
+      document.getElementById('yoyThA').textContent = labelA;
+      document.getElementById('yoyThB').textContent = labelB;
+      var tbody = document.getElementById('yoyDetailBody');
+      var html = '';
+      for (var dl = 0; dl < yoyDetailData.length; dl++) {
+        var d = yoyDetailData[dl];
+        var rateClass = d.rate > 0 ? 'positive' : (d.rate < 0 ? 'negative' : 'zero-change');
+        var sign = d.rate > 0 ? '+' : '';
+        html += '<tr>';
+        html += '<td>' + escapeHtml(d.cat) + '</td>';
+        html += '<td>' + d.qa.toFixed(2) + '</td>';
+        html += '<td>' + d.qb.toFixed(2) + '</td>';
+        html += '<td class="' + rateClass + '">' + sign + d.rate + '%</td>';
+        html += '</tr>';
+      }
+      tbody.innerHTML = html;
+
+      document.getElementById('yoyChartSection').classList.add('show');
+      document.getElementById('yoyDetailSection').classList.add('show');
+
+      // ====== Client × Category Detail Table ======
+      // 1. Collect clients and categories that appear in either period
+      var clientSet = {};
+      var catSet2 = {};
+      for (var di2 = 0; di2 < gData.length; di2++) {
+        if (yoySelectedA[gData[di2].shipMonth] || yoySelectedB[gData[di2].shipMonth]) {
+          clientSet[gData[di2].client] = true;
+          catSet2[gData[di2].classification] = true;
+        }
+      }
+      var clientsArr = Object.keys(clientSet).sort();
+      var catsArr2 = sortedCats(catSet2);
+
+      // 2. Compute qty per client per category for A and B
+      var clientQtyA = {};
+      var clientQtyB = {};
+      for (var ci2 = 0; ci2 < clientsArr.length; ci2++) {
+        clientQtyA[clientsArr[ci2]] = {};
+        clientQtyB[clientsArr[ci2]] = {};
+        for (var cj2 = 0; cj2 < catsArr2.length; cj2++) {
+          clientQtyA[clientsArr[ci2]][catsArr2[cj2]] = 0;
+          clientQtyB[clientsArr[ci2]][catsArr2[cj2]] = 0;
+        }
+      }
+      for (var dk = 0; dk < gData.length; dk++) {
+        var dd = gData[dk];
+        if (yoySelectedA[dd.shipMonth]) {
+          clientQtyA[dd.client][dd.classification] += dd.qty;
+        }
+        if (yoySelectedB[dd.shipMonth]) {
+          clientQtyB[dd.client][dd.classification] += dd.qty;
+        }
+      }
+
+      // 3. Render table head: Client | Cat1(A,B,Rate) | Cat2(A,B,Rate) | ...
+      var thead2 = document.getElementById('yoyClientHead');
+      var headHtml = '<tr><th rowspan="2" style="min-width:100px;">客户名称</th>';
+      // second header row
+      var headHtml2 = '<tr>';
+      for (var ck2 = 0; ck2 < catsArr2.length; ck2++) {
+        headHtml += '<th colspan="3" style="text-align:center;font-size:11px;">' + escapeHtml(catsArr2[ck2]) + '</th>';
+        headHtml2 += '<th style="font-size:10px;padding:2px 4px;">A期</th>';
+        headHtml2 += '<th style="font-size:10px;padding:2px 4px;">B期</th>';
+        headHtml2 += '<th style="font-size:10px;padding:2px 4px;">变化率</th>';
+      }
+      headHtml += '</tr>';
+      headHtml2 += '</tr>';
+      thead2.innerHTML = headHtml + headHtml2;
+
+      // 4. Render table body
+      var tbody2 = document.getElementById('yoyClientBody');
+      var bodyHtml = '';
+      for (var cl2 = 0; cl2 < clientsArr.length; cl2++) {
+        var client2 = clientsArr[cl2];
+        bodyHtml += '<tr><td style="font-weight:500;">' + escapeHtml(client2) + '</td>';
+        for (var cm2 = 0; cm2 < catsArr2.length; cm2++) {
+          var cat2 = catsArr2[cm2];
+          var qa2 = clientQtyA[client2][cat2];
+          var qb2 = clientQtyB[client2][cat2];
+          var rate2 = 0;
+          if (qa2 === 0 && qb2 === 0) rate2 = 0;
+          else if (qa2 === 0) rate2 = 100;
+          else rate2 = Math.round(((qb2 - qa2) / qa2 * 100) * 10) / 10;
+
+          var rateClass2 = rate2 > 0 ? 'positive' : (rate2 < 0 ? 'negative' : 'zero-change');
+          var sign2 = rate2 > 0 ? '+' : '';
+
+          bodyHtml += '<td style="font-size:11px;padding:3px 6px;">' + (qa2 > 0 ? qa2.toFixed(1) : '—') + '</td>';
+          bodyHtml += '<td style="font-size:11px;padding:3px 6px;">' + (qb2 > 0 ? qb2.toFixed(1) : '—') + '</td>';
+          bodyHtml += '<td style="font-size:11px;padding:3px 6px;" class="' + rateClass2 + '">' + (qa2 === 0 && qb2 === 0 ? '—' : sign2 + rate2 + '%') + '</td>';
+        }
+        bodyHtml += '</tr>';
+      }
+      tbody2.innerHTML = bodyHtml;
+
+      // 5. Update badge and show section
+      document.getElementById('yoyClientBadge').textContent = clientsArr.length + ' 个客户 · ' + catsArr2.length + ' 个分类';
+      document.getElementById('yoyClientSection').classList.add('show');
+
+      document.getElementById('spinner').classList.remove('show');
+
+      setTimeout(function() { myChart.resize(); }, 100);
+
+    } catch (err) {
+      console.error(err);
+      showToast('生成图表失败：' + err.message);
+      document.getElementById('spinner').classList.remove('show');
+    }
+  }, 50);
+}
+
+function yoyFormatPeriodLabel(monthsArr) {
+  if (!monthsArr || monthsArr.length === 0) return '';
+  if (monthsArr.length === 1) return monthsArr[0];
+  monthsArr.sort();
+  var years = {};
+  for (var i = 0; i < monthsArr.length; i++) {
+    var y = monthsArr[i].substring(0, 4);
+    if (!years[y]) years[y] = [];
+    years[y].push(parseInt(monthsArr[i].substring(5)));
+  }
+  var parts = [];
+  Object.keys(years).sort().forEach(function(yr) {
+    parts.push(yr + '年(' + years[yr].sort(function(a,b){return a-b;}).join(',').replace(/,/g,'、') + '月)');
+  });
+  return parts.join(' vs ');
+}
+
+/* ================================================================
+   FLOATING STICKY NOTE — 汇报便签
+   ================================================================ */
+var notePanel  = document.getElementById('notePanel');
+var noteToggle = document.getElementById('noteToggle');
+var noteEditor = document.getElementById('noteEditor');
+var noteSaveHint = document.getElementById('noteSaveHint');
+var noteSaveTimer = null;
+
+// ---- Toggle ----
+noteToggle.addEventListener('click', function() {
+  notePanel.classList.toggle('show');
+  if (notePanel.classList.contains('show')) {
+    setTimeout(function() { noteEditor.focus(); }, 50);
+  }
+});
+
+// ---- Minimize / Restore ----
+function noteMinimize() {
+  notePanel.classList.toggle('minimized');
+  var btn = document.getElementById('noteMinBtn');
+  btn.textContent = notePanel.classList.contains('minimized') ? '▢' : '—';
+}
+
+// ---- Rich text formatting ----
+function noteFormat(cmd, val) {
+  document.execCommand(cmd, false, val || null);
+  noteEditor.focus();
+  noteSave();
+}
+
+// ---- Clear ----
+function noteClear() {
+  if (confirm('确定清空便签内容吗？')) {
+    noteEditor.innerHTML = '';
+    noteSave();
+    noteEditor.focus();
+  }
+}
+
+// ---- Save / Load ----
+function noteSave() {
+  try {
+    localStorage.setItem('tradeNoteContent', noteEditor.innerHTML);
+    var rect = notePanel.getBoundingClientRect();
+    localStorage.setItem('tradeNoteState', JSON.stringify({
+      left: notePanel.style.left || '',
+      top: notePanel.style.top || '',
+      width: notePanel.style.width || '',
+      height: notePanel.style.height || '',
+      minimized: notePanel.classList.contains('minimized')
+    }));
+    noteSaveHint.textContent = '已保存';
+    noteSaveHint.style.opacity = '0.6';
+  } catch(e) {
+    noteSaveHint.textContent = '保存失败';
+    noteSaveHint.style.opacity = '1';
+  }
+}
+
+function noteLoad() {
+  try {
+    var content = localStorage.getItem('tradeNoteContent');
+    if (content) noteEditor.innerHTML = content;
+    var st = JSON.parse(localStorage.getItem('tradeNoteState') || '{}');
+    if (st.left)   notePanel.style.left   = st.left;
+    if (st.top)    notePanel.style.top    = st.top;
+    if (st.width)  notePanel.style.width  = st.width;
+    if (st.height) notePanel.style.height = st.height;
+    if (st.minimized) {
+      notePanel.classList.add('minimized');
+      document.getElementById('noteMinBtn').textContent = '▢';
+    }
+  } catch(e) {}
+}
+
+// Debounced auto-save on input
+noteEditor.addEventListener('input', function() {
+  noteSaveHint.textContent = '编辑中...';
+  noteSaveHint.style.opacity = '0.9';
+  if (noteSaveTimer) clearTimeout(noteSaveTimer);
+  noteSaveTimer = setTimeout(noteSave, 600);
+});
+
+// ---- Drag ----
+(function() {
+  var header = document.getElementById('noteHeader');
+  var dragging = false, sx, sy, sLeft, sTop;
+
+  header.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'BUTTON') return;
+    dragging = true;
+    sx = e.clientX; sy = e.clientY;
+    var rect = notePanel.getBoundingClientRect();
+    sLeft = rect.left; sTop = rect.top;
+    notePanel.style.right = 'auto';
+    notePanel.style.left = sLeft + 'px';
+    notePanel.style.top  = sTop + 'px';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    var nx = Math.max(0, Math.min(window.innerWidth - 80, sLeft + e.clientX - sx));
+    var ny = Math.max(0, Math.min(window.innerHeight - 50, sTop + e.clientY - sy));
+    notePanel.style.left = nx + 'px';
+    notePanel.style.top  = ny + 'px';
+  });
+  document.addEventListener('mouseup', function() {
+    if (dragging) { dragging = false; noteSave(); }
+  });
+})();
+
+// ---- Resize ----
+(function() {
+  var handle = document.getElementById('noteResize');
+  var resizing = false, sx, sy, sW, sH;
+
+  handle.addEventListener('mousedown', function(e) {
+    resizing = true;
+    sx = e.clientX; sy = e.clientY;
+    var rect = notePanel.getBoundingClientRect();
+    sW = rect.width; sH = rect.height;
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!resizing) return;
+    notePanel.style.width  = Math.max(300, sW + e.clientX - sx) + 'px';
+    notePanel.style.height = Math.max(220, sH + e.clientY - sy) + 'px';
+    // Dispose minimized during resize
+    if (notePanel.classList.contains('minimized')) {
+      notePanel.classList.remove('minimized');
+      document.getElementById('noteMinBtn').textContent = '—';
+    }
+  });
+  document.addEventListener('mouseup', function() {
+    if (resizing) { resizing = false; noteSave(); }
+  });
+})();
+
+// ---- Init ----
+noteLoad();
+</script>
+</body>
+</html>
