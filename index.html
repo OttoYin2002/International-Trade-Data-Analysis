@@ -4,8 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>外贸订单分析平台</title>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="libs/echarts.min.js"></script>
+<script src="libs/xlsx.full.min.js"></script>
+<script>
+  // 本地库加载失败时回退到 CDN，双保险
+  if (typeof XLSX === 'undefined') document.write('<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"><\/script>');
+  if (typeof echarts === 'undefined') document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+</script>
 <style>
 * { margin:0; padding:0; box-sizing: border-box; }
 :root {
@@ -237,6 +242,13 @@ tfoot td:first-child { text-align: left; padding-left: 20px; }
 .dot-b { background: var(--blue); }
 .period-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .period-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.period-remove {
+  margin-left: 8px; border: 1px solid var(--border); background: #fff; color: #94a3b8;
+  font-size: 12px; cursor: pointer; line-height: 1; padding: 1px 6px; border-radius: 3px;
+}
+.period-remove:hover { color: #dc2626; border-color: #dc2626; }
+.rate-sub { display: block; font-size: 9px; font-weight: 600; margin-top: 1px; line-height: 1.2; }
+.sparkline { vertical-align: middle; display: inline-block; }
 
 /* Chart */
 .chart-section { display: none; margin-top: 16px; }
@@ -447,24 +459,12 @@ th:first-child, td:first-child { text-align: left; padding-left: 18px; }
     <!-- Tab 2: YoY -->
     <div class="tab-panel" id="panelYoy">
       <div class="panel-card">
-        <div class="period-row">
-          <div class="period-col">
-            <div class="period-label"><span class="dot dot-a"></span> 时间段 A（基准期）</div>
-            <div class="period-chips" id="chipsA"></div>
-          </div>
-          <div class="period-col">
-            <div class="period-label"><span class="dot dot-b"></span> 时间段 B（对比期）</div>
-            <div class="period-chips" id="chipsB"></div>
-          </div>
-        </div>
+        <div class="period-row" id="yoyPeriodsWrap"></div>
         <div class="period-actions">
-          <span class="info" id="yoyInfo">请选择两个时间段</span>
-          <div style="display:flex; gap:8px;">
-            <button class="btn btn-outline btn-sm" onclick="yoySelectAllA()">全选A</button>
-            <button class="btn btn-outline btn-sm" onclick="yoyClearA()">清空A</button>
-            <button class="btn btn-outline btn-sm" onclick="yoySelectAllB()">全选B</button>
-            <button class="btn btn-outline btn-sm" onclick="yoyClearB()">清空B</button>
-            <button class="btn btn-primary btn-sm" onclick="yoyGenerate()" style="margin-left:8px;">生成对比图</button>
+          <span class="info" id="yoyInfo">请为各时间段选择月份（时间段1为基准期）</span>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="yoyAddPeriod()">+ 添加时间段</button>
+            <button class="btn btn-primary btn-sm" onclick="yoyGenerate()">生成对比图</button>
           </div>
         </div>
       </div>
@@ -560,10 +560,11 @@ th:first-child, td:first-child { text-align: left; padding-left: 18px; }
     <div class="detail-card">
       <div class="detail-header">
         <h3>同比变化明细</h3>
+        <button class="btn btn-outline btn-sm" onclick="yoyDetailExport()">导出 Excel</button>
       </div>
       <div class="detail-table-wrap">
         <table class="detail-table" id="yoyDetailTable">
-          <thead><tr><th>物料分类</th><th id="yoyThA">时间段A</th><th id="yoyThB">时间段B</th><th>同比变化率</th></tr></thead>
+          <thead id="yoyDetailHead"></thead>
           <tbody id="yoyDetailBody"></tbody>
         </table>
       </div>
@@ -575,7 +576,10 @@ th:first-child, td:first-child { text-align: left; padding-left: 18px; }
     <div class="detail-card">
       <div class="detail-header">
         <h3>客户 × 物料分类 同比明细</h3>
-        <span class="detail-badge" id="yoyClientBadge"></span>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="detail-badge" id="yoyClientBadge"></span>
+          <button class="btn btn-outline btn-sm" onclick="yoyClientExport()">导出 Excel</button>
+        </div>
       </div>
       <div class="detail-table-wrap" style="overflow-x:auto;">
         <table class="detail-table" id="yoyClientTable">
@@ -658,8 +662,12 @@ var gData = [];
 var gAllMonths = [];
 var gRawHeaders = [];
 var pivotSelectedMonths = {};
-var yoySelectedA = {};
-var yoySelectedB = {};
+var yoyPeriods = [];                       // 动态多时间段：[{ sel: {month:true} }, ...]
+var yoyPeriodColors = ['#00489D', '#0073e6', '#c8860d', '#2f855a', '#8E44AD', '#E74C3C'];
+var yoyLabels = [];                        // 各时间段显示标签
+var yoyDetailData = null;                  // 物料分类同比明细（渲染+导出用）
+var yoyClientCats = [];                    // 客户×分类明细的分类列表
+var yoyClientQty = null;                   // 客户 -> 分类 -> [各期数量]
 var gPivotClients = [];
 var gPivotSelectedMonthSet = {};
 var gRawCurrentClient = '';
@@ -828,6 +836,10 @@ function processRows(rows) {
    ================================================================ */
 function handleFile(file) {
   if (!file.name.match(/\.xlsx?$/i)) { showToast('请上传 .xlsx 或 .xls 格式的文件'); return; }
+  if (typeof XLSX === 'undefined') {
+    showToast('Excel 解析库加载失败，请检查网络后刷新页面（Ctrl+F5）重试');
+    return;
+  }
   document.getElementById('spinner').classList.add('show');
 
   var reader = new FileReader();
@@ -1524,6 +1536,12 @@ function pivotRawRender() {
    YoY: Period Pickers
    ================================================================ */
 function buildYoyPeriodPickers() {
+  yoyPeriods = [ { sel: {} }, { sel: {} } ];   // 默认两个时间段，可继续添加
+  renderYoyPeriods();
+}
+
+function yoyChipsHtml(pi) {
+  var sel = yoyPeriods[pi].sel;
   var byYear = {};
   for (var mi = 0; mi < gAllMonths.length; mi++) {
     var m = gAllMonths[mi];
@@ -1532,89 +1550,102 @@ function buildYoyPeriodPickers() {
     byYear[y].push(m);
   }
   var years = Object.keys(byYear).sort();
-
-  var htmlA = '', htmlB = '';
+  var html = '';
   for (var yi = 0; yi < years.length; yi++) {
     var y = years[yi];
     byYear[y].sort();
-    htmlA += '<div class="year-label">' + y + '年</div>';
-    htmlB += '<div class="year-label">' + y + '年</div>';
+    html += '<div class="year-label">' + y + '年</div>';
     for (var mi2 = 0; mi2 < byYear[y].length; mi2++) {
       var m2 = byYear[y][mi2];
       var parts = m2.split('-');
       var label = parts[0] + '年' + parseInt(parts[1]) + '月';
-      htmlA += '<div class="month-chip" data-month="' + m2 + '" onclick="yoyToggleChipA(this, \'' + m2 + '\')">' + label + '</div>';
-      htmlB += '<div class="month-chip" data-month="' + m2 + '" onclick="yoyToggleChipB(this, \'' + m2 + '\')">' + label + '</div>';
+      var selCls = sel[m2] ? ' selected' : '';
+      html += '<div class="month-chip' + selCls + '" data-month="' + m2 + '" onclick="yoyToggleChip(' + pi + ', this, \'' + m2 + '\')">' + label + '</div>';
     }
   }
-  document.getElementById('chipsA').innerHTML = htmlA;
-  document.getElementById('chipsB').innerHTML = htmlB;
+  return html;
 }
 
-function yoyToggleChipA(chipEl, month) {
+function renderYoyPeriods() {
+  var wrap = document.getElementById('yoyPeriodsWrap');
+  var html = '';
+  for (var i = 0; i < yoyPeriods.length; i++) {
+    var color = yoyPeriodColors[i % yoyPeriodColors.length];
+    var role = i === 0 ? '（基准期）' : '';
+    html += '<div class="period-col" style="min-width:240px;">';
+    html += '<div class="period-label"><span class="dot" style="background:' + color + ';"></span> 时间段' + (i + 1) + role;
+    if (yoyPeriods.length > 2) {
+      html += '<button class="period-remove" onclick="yoyRemovePeriod(' + i + ')" title="删除该时间段">&times;</button>';
+    }
+    html += '</div>';
+    html += '<div class="period-chips" id="yoyChips' + i + '">' + yoyChipsHtml(i) + '</div>';
+    html += '<div style="margin-top:8px; display:flex; gap:6px;">';
+    html += '<button class="btn btn-outline btn-sm" style="font-size:11px; padding:3px 10px;" onclick="yoySelectAll(' + i + ')">全选</button>';
+    html += '<button class="btn btn-outline btn-sm" style="font-size:11px; padding:3px 10px;" onclick="yoyClear(' + i + ')">清空</button>';
+    html += '</div>';
+    html += '</div>';
+  }
+  wrap.innerHTML = html;
+  yoyUpdateInfo();
+}
+
+function yoyToggleChip(pi, chipEl, month) {
+  var sel = yoyPeriods[pi].sel;
   if (chipEl.classList.contains('selected')) {
     chipEl.classList.remove('selected');
-    delete yoySelectedA[month];
+    delete sel[month];
   } else {
     chipEl.classList.add('selected');
-    yoySelectedA[month] = true;
+    sel[month] = true;
   }
   yoyUpdateInfo();
 }
 
-function yoyToggleChipB(chipEl, month) {
-  if (chipEl.classList.contains('selected')) {
-    chipEl.classList.remove('selected');
-    delete yoySelectedB[month];
-  } else {
-    chipEl.classList.add('selected');
-    yoySelectedB[month] = true;
-  }
-  yoyUpdateInfo();
-}
-
-function yoySelectAllA() {
-  yoySelectedA = {};
-  var chips = document.querySelectorAll('#chipsA .month-chip');
+function yoySelectAll(pi) {
+  var sel = yoyPeriods[pi].sel = {};
+  var chips = document.querySelectorAll('#yoyChips' + pi + ' .month-chip');
   for (var i = 0; i < chips.length; i++) {
     chips[i].classList.add('selected');
-    yoySelectedA[chips[i].getAttribute('data-month')] = true;
+    sel[chips[i].getAttribute('data-month')] = true;
   }
   yoyUpdateInfo();
 }
 
-function yoyClearA() {
-  yoySelectedA = {};
-  var chips = document.querySelectorAll('#chipsA .month-chip');
+function yoyClear(pi) {
+  yoyPeriods[pi].sel = {};
+  var chips = document.querySelectorAll('#yoyChips' + pi + ' .month-chip');
   for (var i = 0; i < chips.length; i++) chips[i].classList.remove('selected');
   yoyUpdateInfo();
 }
 
-function yoySelectAllB() {
-  yoySelectedB = {};
-  var chips = document.querySelectorAll('#chipsB .month-chip');
-  for (var i = 0; i < chips.length; i++) {
-    chips[i].classList.add('selected');
-    yoySelectedB[chips[i].getAttribute('data-month')] = true;
-  }
-  yoyUpdateInfo();
+function yoyAddPeriod() {
+  if (yoyPeriods.length >= 6) { showToast('最多支持 6 个时间段对比'); return; }
+  yoyPeriods.push({ sel: {} });
+  renderYoyPeriods();
 }
 
-function yoyClearB() {
-  yoySelectedB = {};
-  var chips = document.querySelectorAll('#chipsB .month-chip');
-  for (var i = 0; i < chips.length; i++) chips[i].classList.remove('selected');
-  yoyUpdateInfo();
+function yoyRemovePeriod(pi) {
+  if (yoyPeriods.length <= 2) { showToast('至少保留两个时间段'); return; }
+  yoyPeriods.splice(pi, 1);
+  renderYoyPeriods();
 }
 
 function yoyUpdateInfo() {
-  var countA = Object.keys(yoySelectedA).length;
-  var countB = Object.keys(yoySelectedB).length;
+  var counts = [];
+  var filled = 0;
+  for (var i = 0; i < yoyPeriods.length; i++) {
+    var c = Object.keys(yoyPeriods[i].sel).length;
+    counts.push(c);
+    if (c > 0) filled++;
+  }
   var el = document.getElementById('yoyInfo');
-  if (countA === 0 && countB === 0) el.textContent = '请选择时间段A和时间段B';
-  else if (countA > 0 && countB === 0) el.textContent = '已选A: ' + countA + '个月，请选择时间段B';
-  else if (countA === 0 && countB > 0) el.textContent = '已选B: ' + countB + '个月，请选择时间段A';
-  else el.textContent = '已选A: ' + countA + '个月，B: ' + countB + '个月，可生成对比图';
+  if (filled === 0) {
+    el.textContent = '请为各时间段选择月份（时间段1为基准期）';
+  } else {
+    var parts = [];
+    for (var j = 0; j < counts.length; j++) parts.push('段' + (j + 1) + ': ' + counts[j] + '个月');
+    el.textContent = parts.join('，') + (filled >= 2 ? '，可生成对比图' : '，请再选择其他时间段');
+  }
 }
 
 /* ================================================================
@@ -1626,67 +1657,114 @@ function yoyGenerate() {
   document.getElementById('yoyDetailSection').classList.remove('show');
   document.getElementById('yoyClientSection').classList.remove('show');
 
-  var aKeys = Object.keys(yoySelectedA);
-  var bKeys = Object.keys(yoySelectedB);
-  if (aKeys.length === 0 || bKeys.length === 0) {
-    showToast('请同时选择时间段A和时间段B');
-    return;
+  var N = yoyPeriods.length;
+  var selKeys = [];
+  for (var pi = 0; pi < N; pi++) {
+    var keys = Object.keys(yoyPeriods[pi].sel).sort();
+    if (keys.length === 0) {
+      showToast('时间段' + (pi + 1) + ' 至少选择 1 个月');
+      return;
+    }
+    selKeys.push(keys);
   }
 
   document.getElementById('spinner').classList.add('show');
   setTimeout(function() {
     try {
-      // Build category set
+      // Build period month sets & category set
+      var sets = [];
       var catsSet = {};
+      for (var si = 0; si < N; si++) {
+        var s = {};
+        for (var sj = 0; sj < selKeys[si].length; sj++) s[selKeys[si][sj]] = true;
+        sets.push(s);
+      }
       for (var di = 0; di < gData.length; di++) {
-        if (yoySelectedA[gData[di].shipMonth] || yoySelectedB[gData[di].shipMonth]) {
-          catsSet[gData[di].classification] = true;
+        for (var dk0 = 0; dk0 < N; dk0++) {
+          if (sets[dk0][gData[di].shipMonth]) { catsSet[gData[di].classification] = true; break; }
         }
       }
 
       var catsArr = sortedCats(catsSet);
 
-      // Compute quantities
-      var qtyA = {}, qtyB = {};
-      for (var ci = 0; ci < catsArr.length; ci++) { qtyA[catsArr[ci]] = 0; qtyB[catsArr[ci]] = 0; }
+      // Compute quantities per period
+      var qtyP = [];
+      for (var qp = 0; qp < N; qp++) {
+        var mp = {};
+        for (var qc = 0; qc < catsArr.length; qc++) mp[catsArr[qc]] = 0;
+        qtyP.push(mp);
+      }
       for (var dj = 0; dj < gData.length; dj++) {
-        if (yoySelectedA[gData[dj].shipMonth]) qtyA[gData[dj].classification] += gData[dj].qty;
-        if (yoySelectedB[gData[dj].shipMonth]) qtyB[gData[dj].classification] += gData[dj].qty;
+        for (var dk = 0; dk < N; dk++) {
+          if (sets[dk][gData[dj].shipMonth]) {
+            qtyP[dk][gData[dj].classification] += gData[dj].qty;
+            break;   // 同一月份只归入其所属时间段（避免跨段重复计数）
+          }
+        }
       }
 
-      // Change rates
-      var rates = [];
-      for (var ck = 0; ck < catsArr.length; ck++) {
-        var a = qtyA[catsArr[ck]], b = qtyB[catsArr[ck]];
-        if (a === 0 && b === 0) rates.push(0);
-        else if (a === 0) rates.push(100);
-        else rates.push(Math.round(((b - a) / a * 100) * 10) / 10);
+      var labels = [];
+      for (var li = 0; li < N; li++) labels.push(yoyFormatPeriodLabel(selKeys[li]));
+      yoyLabels = labels;
+
+      // Overall change rate: last period vs first period (基准)
+      var overall = {};
+      for (var oc = 0; oc < catsArr.length; oc++) {
+        var c0 = catsArr[oc];
+        var base = qtyP[0][c0], last = qtyP[N - 1][c0];
+        if (base === 0 && last === 0) overall[c0] = null;
+        else if (base === 0) overall[c0] = 'new';
+        else overall[c0] = Math.round(((last - base) / base * 100) * 10) / 10;
       }
 
-      var labelA = yoyFormatPeriodLabel(Object.keys(yoySelectedA));
-      var labelB = yoyFormatPeriodLabel(Object.keys(yoySelectedB));
-
-      // Save detail
+      // Save detail (for render & export)
       yoyDetailData = [];
       for (var cl = 0; cl < catsArr.length; cl++) {
-        yoyDetailData.push({
-          cat: catsArr[cl],
-          qa: Math.round(qtyA[catsArr[cl]] * 100) / 100,
-          qb: Math.round(qtyB[catsArr[cl]] * 100) / 100,
-          rate: rates[cl]
-        });
+        var catS = catsArr[cl];
+        var arr = [];
+        for (var sp = 0; sp < N; sp++) arr.push(Math.round(qtyP[sp][catS] * 100) / 100);
+        yoyDetailData.push({ cat: catS, qtys: arr, overall: overall[catS] });
       }
 
-      // ECharts
+      // ===== ECharts =====
       var chartDom = document.getElementById('chartContainer');
       if (window._myChart) { echarts.dispose(window._myChart); window._myChart = null; }
       var myChart = echarts.init(chartDom, null, { renderer: 'canvas' });
 
-      var barDataA = [], barDataB = [];
-      for (var cm = 0; cm < catsArr.length; cm++) {
-        barDataA.push(Math.round(qtyA[catsArr[cm]] * 100) / 100);
-        barDataB.push(Math.round(qtyB[catsArr[cm]] * 100) / 100);
+      var rateName = '整体变化率(%)';
+      var legendData = labels.concat([rateName]);
+      var overallLine = [];
+      for (var ol = 0; ol < catsArr.length; ol++) {
+        var ovv = overall[catsArr[ol]];
+        overallLine.push(ovv === 'new' || ovv === null ? null : ovv);
       }
+
+      var series = [];
+      for (var bs = 0; bs < N; bs++) {
+        var bd = [];
+        for (var b2 = 0; b2 < catsArr.length; b2++) bd.push(Math.round(qtyP[bs][catsArr[b2]] * 100) / 100);
+        series.push({
+          name: labels[bs], type: 'bar', data: bd,
+          barMaxWidth: 42,
+          itemStyle: { color: yoyPeriodColors[bs % yoyPeriodColors.length], borderRadius: [2, 2, 0, 0] },
+          label: { show: N <= 3, position: 'top', fontSize: 10, color: '#64748b',
+            formatter: function(p) { return p.value > 0 ? p.value.toFixed(1) : ''; }
+          }
+        });
+      }
+      series.push({
+        name: rateName, type: 'line', yAxisIndex: 1, data: overallLine,
+        symbol: 'circle', symbolSize: 7, connectNulls: false,
+        itemStyle: { color: '#c8860d' },
+        lineStyle: { width: 2 },
+        label: {
+          show: true, position: 'top', fontSize: 10, color: '#64748b',
+          formatter: function(p) {
+            if (p.value === null || p.value === undefined) return '';
+            return (p.value >= 0 ? '+' : '') + p.value + '%';
+          }
+        }
+      });
 
       var option = {
         tooltip: {
@@ -1695,9 +1773,10 @@ function yoyGenerate() {
           backgroundColor: 'rgba(0,72,157,0.92)', borderColor: '#00489D', textStyle: { color: '#fff', fontSize: 12 },
           formatter: function(params) {
             var s = '<b>' + params[0].name + '</b><br/>';
-            for (var pi = 0; pi < params.length; pi++) {
-              var p = params[pi];
-              if (p.seriesName === '同比变化率(%)') {
+            for (var pi2 = 0; pi2 < params.length; pi2++) {
+              var p = params[pi2];
+              if (p.seriesName === rateName) {
+                if (p.value === null || p.value === undefined) continue;
                 var col = p.value >= 0 ? '#16a34a' : '#dc2626';
                 s += '<span style="color:' + col + '">●</span> ' + p.seriesName + '：<b>' + (p.value >= 0 ? '+' : '') + p.value + '%</b><br/>';
               } else {
@@ -1707,7 +1786,7 @@ function yoyGenerate() {
             return s;
           }
         },
-        legend: { data: [labelA, labelB, '同比变化率(%)'], top: 8, textStyle: { fontSize: 12, color: '#4a5568' } },
+        legend: { data: legendData, top: 8, textStyle: { fontSize: 12, color: '#4a5568' } },
         grid: { left: '3%', right: '8%', bottom: '3%', top: 60, containLabel: true },
         xAxis: {
           type: 'category', data: catsArr,
@@ -1717,140 +1796,22 @@ function yoyGenerate() {
         },
         yAxis: [
           { type: 'value', name: '订单数量', nameTextStyle: { fontSize: 11, color: '#64748b' }, axisLabel: { fontSize: 11, color: '#64748b' }, splitLine: { lineStyle: { color: '#edf2f7' } }, axisLine: { show: false }, axisTick: { show: false } },
-          { type: 'value', name: '同比变化率(%)', nameTextStyle: { fontSize: 11, color: '#64748b' }, axisLabel: { fontSize: 11, color: '#64748b', formatter: '{value}%' }, splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false } }
+          { type: 'value', name: '整体变化率(%)', nameTextStyle: { fontSize: 11, color: '#64748b' }, axisLabel: { fontSize: 11, color: '#64748b', formatter: '{value}%' }, splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false } }
         ],
-        series: [
-          {
-            name: labelA, type: 'bar', data: barDataA,
-            barWidth: catsArr.length > 10 ? '30%' : '40%',
-            itemStyle: { color: '#00489D', borderRadius: [2, 2, 0, 0] },
-            label: { show: true, position: 'top', fontSize: 10, color: '#64748b',
-              formatter: function(p) { return p.value > 0 ? p.value.toFixed(1) : ''; }
-            }
-          },
-          {
-            name: labelB, type: 'bar', data: barDataB,
-            barWidth: catsArr.length > 10 ? '30%' : '40%',
-            itemStyle: { color: '#0073e6', borderRadius: [2, 2, 0, 0] },
-            label: { show: true, position: 'top', fontSize: 10, color: '#64748b',
-              formatter: function(p) { return p.value > 0 ? p.value.toFixed(1) : ''; }
-            }
-          },
-          {
-            name: '同比变化率(%)', type: 'line', yAxisIndex: 1, data: rates,
-            symbol: 'circle', symbolSize: 7,
-            itemStyle: { color: '#c8860d' },
-            lineStyle: { width: 2 },
-            label: {
-              show: true, position: 'top', fontSize: 10, color: '#64748b',
-              formatter: function(p) { return (p.value >= 0 ? '+' : '') + p.value + '%'; }
-            }
-          }
-        ]
+        series: series
       };
 
       myChart.setOption(option);
       window._myChart = myChart;
 
-      // Detail table
-      document.getElementById('yoyThA').textContent = labelA;
-      document.getElementById('yoyThB').textContent = labelB;
-      var tbody = document.getElementById('yoyDetailBody');
-      var html = '';
-      for (var dl = 0; dl < yoyDetailData.length; dl++) {
-        var d = yoyDetailData[dl];
-        var rateClass = d.rate > 0 ? 'positive' : (d.rate < 0 ? 'negative' : 'zero-change');
-        var sign = d.rate > 0 ? '+' : '';
-        html += '<tr>';
-        html += '<td>' + escapeHtml(d.cat) + '</td>';
-        html += '<td>' + d.qa.toFixed(2) + '</td>';
-        html += '<td>' + d.qb.toFixed(2) + '</td>';
-        html += '<td class="' + rateClass + '">' + sign + d.rate + '%</td>';
-        html += '</tr>';
-      }
-      tbody.innerHTML = html;
+      // ===== Category Detail Table =====
+      renderYoyDetailTable();
 
       document.getElementById('yoyChartSection').classList.add('show');
       document.getElementById('yoyDetailSection').classList.add('show');
 
-      // ====== Client × Category Detail Table ======
-      // 1. Collect clients and categories that appear in either period
-      var clientSet = {};
-      var catSet2 = {};
-      for (var di2 = 0; di2 < gData.length; di2++) {
-        if (yoySelectedA[gData[di2].shipMonth] || yoySelectedB[gData[di2].shipMonth]) {
-          clientSet[gData[di2].client] = true;
-          catSet2[gData[di2].classification] = true;
-        }
-      }
-      var clientsArr = Object.keys(clientSet).sort();
-      var catsArr2 = sortedCats(catSet2);
-
-      // 2. Compute qty per client per category for A and B
-      var clientQtyA = {};
-      var clientQtyB = {};
-      for (var ci2 = 0; ci2 < clientsArr.length; ci2++) {
-        clientQtyA[clientsArr[ci2]] = {};
-        clientQtyB[clientsArr[ci2]] = {};
-        for (var cj2 = 0; cj2 < catsArr2.length; cj2++) {
-          clientQtyA[clientsArr[ci2]][catsArr2[cj2]] = 0;
-          clientQtyB[clientsArr[ci2]][catsArr2[cj2]] = 0;
-        }
-      }
-      for (var dk = 0; dk < gData.length; dk++) {
-        var dd = gData[dk];
-        if (yoySelectedA[dd.shipMonth]) {
-          clientQtyA[dd.client][dd.classification] += dd.qty;
-        }
-        if (yoySelectedB[dd.shipMonth]) {
-          clientQtyB[dd.client][dd.classification] += dd.qty;
-        }
-      }
-
-      // 3. Render table head: Client | Cat1(A,B,Rate) | Cat2(A,B,Rate) | ...
-      var thead2 = document.getElementById('yoyClientHead');
-      var headHtml = '<tr><th rowspan="2" style="min-width:100px;">客户名称</th>';
-      // second header row
-      var headHtml2 = '<tr>';
-      for (var ck2 = 0; ck2 < catsArr2.length; ck2++) {
-        headHtml += '<th colspan="3" style="text-align:center;font-size:11px;">' + escapeHtml(catsArr2[ck2]) + '</th>';
-        headHtml2 += '<th style="font-size:10px;padding:2px 4px;">A期</th>';
-        headHtml2 += '<th style="font-size:10px;padding:2px 4px;">B期</th>';
-        headHtml2 += '<th style="font-size:10px;padding:2px 4px;">变化率</th>';
-      }
-      headHtml += '</tr>';
-      headHtml2 += '</tr>';
-      thead2.innerHTML = headHtml + headHtml2;
-
-      // 4. Render table body
-      var tbody2 = document.getElementById('yoyClientBody');
-      var bodyHtml = '';
-      for (var cl2 = 0; cl2 < clientsArr.length; cl2++) {
-        var client2 = clientsArr[cl2];
-        bodyHtml += '<tr><td style="font-weight:500;">' + escapeHtml(client2) + '</td>';
-        for (var cm2 = 0; cm2 < catsArr2.length; cm2++) {
-          var cat2 = catsArr2[cm2];
-          var qa2 = clientQtyA[client2][cat2];
-          var qb2 = clientQtyB[client2][cat2];
-          var rate2 = 0;
-          if (qa2 === 0 && qb2 === 0) rate2 = 0;
-          else if (qa2 === 0) rate2 = 100;
-          else rate2 = Math.round(((qb2 - qa2) / qa2 * 100) * 10) / 10;
-
-          var rateClass2 = rate2 > 0 ? 'positive' : (rate2 < 0 ? 'negative' : 'zero-change');
-          var sign2 = rate2 > 0 ? '+' : '';
-
-          bodyHtml += '<td style="font-size:11px;padding:3px 6px;">' + (qa2 > 0 ? qa2.toFixed(1) : '—') + '</td>';
-          bodyHtml += '<td style="font-size:11px;padding:3px 6px;">' + (qb2 > 0 ? qb2.toFixed(1) : '—') + '</td>';
-          bodyHtml += '<td style="font-size:11px;padding:3px 6px;" class="' + rateClass2 + '">' + (qa2 === 0 && qb2 === 0 ? '—' : sign2 + rate2 + '%') + '</td>';
-        }
-        bodyHtml += '</tr>';
-      }
-      tbody2.innerHTML = bodyHtml;
-
-      // 5. Update badge and show section
-      document.getElementById('yoyClientBadge').textContent = clientsArr.length + ' 个客户 · ' + catsArr2.length + ' 个分类';
-      document.getElementById('yoyClientSection').classList.add('show');
+      // ===== Client × Category Detail Table =====
+      renderYoyClientTable(sets, labels, N);
 
       document.getElementById('spinner').classList.remove('show');
 
@@ -1862,6 +1823,255 @@ function yoyGenerate() {
       document.getElementById('spinner').classList.remove('show');
     }
   }, 50);
+}
+
+/* ---- YoY: 环比信息（单元格小字用）---- */
+/* ---- YoY: Sparkline 迷你趋势线（仅页面展示，导出不含此列）---- */
+function sparklineSVG(values) {
+  var vals = values || [];
+  if (vals.length < 2) return '';
+  var max = 0;
+  for (var i = 0; i < vals.length; i++) { if (vals[i] > max) max = vals[i]; }
+  if (max <= 0) return '';
+  var W = 72, H = 22, PAD = 3;
+  var step = (W - PAD * 2) / (vals.length - 1);
+  var pts = [];
+  for (var k = 0; k < vals.length; k++) {
+    pts.push([PAD + k * step, H - PAD - (vals[k] / max) * (H - PAD * 2)]);
+  }
+  var line = '';
+  for (var p = 0; p < pts.length; p++) line += (p === 0 ? 'M' : 'L') + pts[p][0].toFixed(1) + ',' + pts[p][1].toFixed(1);
+  var area = line + 'L' + pts[pts.length - 1][0].toFixed(1) + ',' + (H - 1) + 'L' + pts[0][0].toFixed(1) + ',' + (H - 1) + 'Z';
+  var dots = '';
+  for (var q = 0; q < pts.length; q++) {
+    if (vals[q] > 0) dots += '<circle cx="' + pts[q][0].toFixed(1) + '" cy="' + pts[q][1].toFixed(1) + '" r="1.8" fill="#00489D"/>';
+  }
+  if (vals[vals.length - 1] > 0) {
+    dots += '<circle cx="' + pts[pts.length - 1][0].toFixed(1) + '" cy="' + pts[pts.length - 1][1].toFixed(1) + '" r="2.4" fill="#E67E22"/>';
+  }
+  return '<svg class="sparkline" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">'
+    + '<path d="' + area + '" fill="rgba(0,72,157,0.08)"/>'
+    + '<path d="' + line + '" fill="none" stroke="#00489D" stroke-width="1.5" stroke-linejoin="round"/>'
+    + dots + '</svg>';
+}
+
+function yoyMomInfo(prev, cur) {
+  if (prev === 0 && cur === 0) return { txt: '', cls: '' };
+  if (prev === 0 && cur > 0) return { txt: '新增', cls: 'positive' };
+  if (prev > 0 && cur === 0) return { txt: '-100%', cls: 'negative' };
+  var r = Math.round(((cur - prev) / prev * 100) * 10) / 10;
+  return { txt: (r > 0 ? '+' : '') + r + '%', cls: r > 0 ? 'positive' : (r < 0 ? 'negative' : 'zero-change') };
+}
+
+/* ---- YoY: 整体变化率文本（导出用）---- */
+function yoyRateText(base, last) {
+  if (base === 0 && last === 0) return '';
+  if (base === 0) return '新增';
+  var r = Math.round(((last - base) / base * 100) * 10) / 10;
+  return (r > 0 ? '+' : '') + r + '%';
+}
+
+/* ---- YoY: 物料分类同比明细表（多时间段）---- */
+function renderYoyDetailTable() {
+  var N = yoyLabels.length;
+  var thead = document.getElementById('yoyDetailHead');
+  var h = '<tr><th>物料分类</th>';
+  for (var i = 0; i < N; i++) h += '<th>' + escapeHtml(yoyLabels[i]) + '</th>';
+  h += '<th>整体变化率<br><span style="font-weight:400;font-size:9px;">(末段 vs 基准)</span></th>';
+  h += '<th style="width:80px;">趋势</th></tr>';
+  thead.innerHTML = h;
+
+  var tbody = document.getElementById('yoyDetailBody');
+  var html = '';
+  for (var ci = 0; ci < yoyDetailData.length; ci++) {
+    var d = yoyDetailData[ci];
+    html += '<tr><td>' + escapeHtml(d.cat) + '</td>';
+    for (var k = 0; k < N; k++) {
+      var v = d.qtys[k];
+      var cell = v > 0 ? v.toFixed(2) : '';
+      var sub = '';
+      if (k > 0) {
+        var mi = yoyMomInfo(d.qtys[k - 1], v);
+        if (mi.txt) sub = '<span class="rate-sub ' + mi.cls + '">' + mi.txt + '</span>';
+      }
+      html += '<td>' + cell + sub + '</td>';
+    }
+    var ov = d.overall, ovTxt = '', ovCls = '';
+    if (ov === 'new') { ovTxt = '新增'; ovCls = 'positive'; }
+    else if (ov !== null && ov !== undefined) {
+      ovTxt = (ov > 0 ? '+' : '') + ov + '%';
+      ovCls = ov > 0 ? 'positive' : (ov < 0 ? 'negative' : 'zero-change');
+    }
+    html += '<td class="' + ovCls + '">' + ovTxt + '</td>';
+    html += '<td style="text-align:center;">' + sparklineSVG(d.qtys) + '</td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+/* ---- YoY: 客户×物料分类同比明细表（多时间段）---- */
+function renderYoyClientTable(sets, labels, N) {
+  // 1. Collect clients & categories
+  var clientSet = {};
+  var catSet2 = {};
+  for (var di = 0; di < gData.length; di++) {
+    for (var dk0 = 0; dk0 < N; dk0++) {
+      if (sets[dk0][gData[di].shipMonth]) {
+        clientSet[gData[di].client] = true;
+        catSet2[gData[di].classification] = true;
+        break;
+      }
+    }
+  }
+  var clientsArr = Object.keys(clientSet).sort();
+  var catsArr2 = sortedCats(catSet2);
+
+  // 2. qty[client][cat] = [per period]
+  var cq = {};
+  for (var ci2 = 0; ci2 < clientsArr.length; ci2++) {
+    cq[clientsArr[ci2]] = {};
+    for (var cj = 0; cj < catsArr2.length; cj++) {
+      cq[clientsArr[ci2]][catsArr2[cj]] = [];
+      for (var z = 0; z < N; z++) cq[clientsArr[ci2]][catsArr2[cj]].push(0);
+    }
+  }
+  for (var dk = 0; dk < gData.length; dk++) {
+    var dd = gData[dk];
+    for (var dk2 = 0; dk2 < N; dk2++) {
+      if (sets[dk2][dd.shipMonth]) {
+        if (cq[dd.client] && cq[dd.client][dd.classification]) {
+          cq[dd.client][dd.classification][dk2] += dd.qty;
+        }
+        break;
+      }
+    }
+  }
+
+  // save for export
+  yoyClientCats = catsArr2;
+  yoyClientQty = cq;
+
+  // 3. Head: Client | Cat(P1..Pn, 变化率)
+  var thead2 = document.getElementById('yoyClientHead');
+  var h1 = '<tr><th rowspan="2" style="min-width:100px;">客户名称</th>';
+  var h2 = '<tr>';
+  for (var ck = 0; ck < catsArr2.length; ck++) {
+    h1 += '<th colspan="' + (N + 1) + '" style="text-align:center;font-size:11px;">' + escapeHtml(catsArr2[ck]) + '</th>';
+    for (var k = 0; k < N; k++) {
+      h2 += '<th style="font-size:10px;padding:2px 4px;" title="' + escapeHtml(labels[k]) + '">P' + (k + 1) + '</th>';
+    }
+    h2 += '<th style="font-size:10px;padding:2px 4px;" title="末段 vs 基准">变化率</th>';
+  }
+  h1 += '<th rowspan="2" style="width:80px;">趋势</th></tr>';
+  h2 += '</tr>';
+  thead2.innerHTML = h1 + h2;
+
+  // 4. Body
+  var tbody2 = document.getElementById('yoyClientBody');
+  var bodyHtml = '';
+  for (var cl = 0; cl < clientsArr.length; cl++) {
+    var client = clientsArr[cl];
+    bodyHtml += '<tr><td style="font-weight:500;">' + escapeHtml(client) + '</td>';
+    for (var cm = 0; cm < catsArr2.length; cm++) {
+      var arr = cq[client][catsArr2[cm]];
+      for (var k2 = 0; k2 < N; k2++) {
+        var v = arr[k2];
+        var cell = v > 0 ? v.toFixed(1) : '';
+        var sub = '';
+        if (k2 > 0) {
+          var mi2 = yoyMomInfo(arr[k2 - 1], v);
+          if (mi2.txt) sub = '<span class="rate-sub ' + mi2.cls + '">' + mi2.txt + '</span>';
+        }
+        bodyHtml += '<td style="font-size:11px;padding:3px 6px;">' + cell + sub + '</td>';
+      }
+      var base = arr[0], last = arr[N - 1];
+      var ovTxt = '', ovCls = '';
+      if (base === 0 && last > 0) { ovTxt = '新增'; ovCls = 'positive'; }
+      else if (base > 0) {
+        var r = Math.round(((last - base) / base * 100) * 10) / 10;
+        ovTxt = (r > 0 ? '+' : '') + r + '%';
+        ovCls = r > 0 ? 'positive' : (r < 0 ? 'negative' : 'zero-change');
+      }
+      bodyHtml += '<td style="font-size:11px;padding:3px 6px;" class="' + ovCls + '">' + ovTxt + '</td>';
+    }
+    // 客户各时间段总量 → Sparkline 迷你趋势线（仅展示，不导出）
+    var clientTot = [];
+    for (var kt = 0; kt < N; kt++) {
+      var s = 0;
+      for (var ct = 0; ct < catsArr2.length; ct++) {
+        s += (cq[client][catsArr2[ct]] && cq[client][catsArr2[ct]][kt]) || 0;
+      }
+      clientTot.push(s);
+    }
+    bodyHtml += '<td style="text-align:center;">' + sparklineSVG(clientTot) + '</td>';
+    bodyHtml += '</tr>';
+  }
+  tbody2.innerHTML = bodyHtml;
+
+  // 5. Badge & show
+  document.getElementById('yoyClientBadge').textContent =
+    clientsArr.length + ' 个客户 · ' + catsArr2.length + ' 个分类 · P1=' + labels[0] + (N > 1 ? ' | P' + N + '=' + labels[N - 1] : '');
+  document.getElementById('yoyClientSection').classList.add('show');
+}
+
+/* ---- YoY: 导出物料分类同比明细 ---- */
+function yoyDetailExport() {
+  if (!yoyDetailData || yoyDetailData.length === 0) { showToast('请先生成对比图'); return; }
+  var N = yoyLabels.length;
+  var aoa = [];
+  var hRow = ['物料分类'];
+  for (var i = 0; i < N; i++) hRow.push('P' + (i + 1) + '：' + yoyLabels[i]);
+  hRow.push('整体变化率(末段vs基准)');
+  aoa.push(hRow);
+  for (var r = 0; r < yoyDetailData.length; r++) {
+    var d = yoyDetailData[r];
+    var row = [d.cat];
+    for (var k = 0; k < N; k++) row.push(d.qtys[k] > 0 ? d.qtys[k] : '');
+    row.push(yoyRateText(d.qtys[0], d.qtys[N - 1]));
+    aoa.push(row);
+  }
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 18 }].concat(yoyLabels.map(function() { return { wch: 22 }; })).concat([{ wch: 20 }]);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '物料分类同比明细');
+  XLSX.writeFile(wb, '同比分析_物料分类明细.xlsx');
+}
+
+/* ---- YoY: 导出客户×物料分类同比明细 ---- */
+function yoyClientExport() {
+  if (!yoyClientQty || !yoyClientCats || yoyClientCats.length === 0) { showToast('请先生成对比图'); return; }
+  var N = yoyLabels.length;
+  var cats = yoyClientCats;
+  var clients = Object.keys(yoyClientQty).sort();
+  if (clients.length === 0) { showToast('请先生成对比图'); return; }
+  var aoa = [];
+  var h = ['客户名称'];
+  for (var ci = 0; ci < cats.length; ci++) {
+    for (var k = 0; k < N; k++) h.push(cats[ci] + ' · P' + (k + 1));
+    h.push(cats[ci] + ' · 变化率');
+  }
+  aoa.push(h);
+  for (var cl = 0; cl < clients.length; cl++) {
+    var row = [clients[cl]];
+    for (var cm = 0; cm < cats.length; cm++) {
+      var arr = yoyClientQty[clients[cl]][cats[cm]] || [];
+      for (var k2 = 0; k2 < N; k2++) {
+        var v = arr[k2] || 0;
+        row.push(v > 0 ? Math.round(v * 100) / 100 : '');
+      }
+      row.push(yoyRateText(arr[0] || 0, arr[N - 1] || 0));
+    }
+    aoa.push(row);
+  }
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  var cols = [{ wch: 30 }];
+  for (var cc = 0; cc < cats.length; cc++) {
+    for (var k3 = 0; k3 < N + 1; k3++) cols.push({ wch: 12 });
+  }
+  ws['!cols'] = cols;
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '客户分类同比明细');
+  XLSX.writeFile(wb, '同比分析_客户物料分类明细.xlsx');
 }
 
 function yoyFormatPeriodLabel(monthsArr) {
